@@ -14,4 +14,3 @@ pnpm install
 pnpm dev        # auth 서버 + 로그인 web 동시 실행
 ```
 
-`.env` 는 각 앱의 `.env.example` 을 복사해서 채운다. 비밀값은 절대 커밋하지 않는다.
