@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: 'Nook Auth',
@@ -13,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body className="min-h-dvh bg-gray-50 antialiased flex items-center justify-center p-6">
+    <html lang="ko" className={cn("dark", "font-sans", geist.variable)}>
+      <body className="bg-background text-foreground min-h-screen">
         {children}
         <Toaster />
       </body>
