@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
@@ -57,7 +57,7 @@ export default function SignInPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: standardSchemaResolver(schema),
     defaultValues: { email: getSavedEmail(), password: '' },
   });
 
@@ -85,21 +85,24 @@ export default function SignInPage() {
     if (redirectUrl) {
       window.location.assign(redirectUrl);
     } else {
-      router.push('/');
+      router.push('/profiles');
     }
   }
 
   return (
-    <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-8 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">로그인</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          계정에 로그인하세요
-        </p>
+    <div>
+      <div className="pb-2">
+        <h1 className="scroll-m-20 text-center text-4xl font-extrabold tracking-tight text-balance">
+          로그인 정보를 입력하세요
+        </h1>
+        <h2 className="text-lg/10 font-semibold text-white/70 ">
+          아니면 새 계정으로 시작하세요
+        </h2>
       </div>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="email">이메일</Label>
+          <Label htmlFor="email">이메일 주소</Label>
           <Input
             id="email"
             type="email"
@@ -141,15 +144,16 @@ export default function SignInPage() {
           {loading ? '로그인 중...' : '로그인'}
         </Button>
       </form>
-      <p className="text-sm text-muted-foreground text-center">
-        계정이 없으신가요?{' '}
+
+      <div className="text-sm text-muted-foreground text-center mt-4">
+        계정이 없으신가요?
         <Link
           href={`/signup${currentSearch}`}
           className="underline hover:text-foreground"
         >
           가입하기
         </Link>
-      </p>
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
@@ -34,7 +34,7 @@ export default function SignUpPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = useForm<FormValues>({ resolver: standardSchemaResolver(schema) });
 
   async function onSubmit(values: FormValues) {
     setLoading(true);
