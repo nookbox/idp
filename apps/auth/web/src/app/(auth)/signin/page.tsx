@@ -145,7 +145,7 @@ export default function SignInPage() {
         </Button>
       </form>
 
-      <div className="text-sm text-muted-foreground text-center mt-4">
+      <div className="text-sm text-muted-foreground text-center mt-4 flex gap-2 justify-center">
         계정이 없으신가요?
         <Link
           href={`/signup${currentSearch}`}

@@ -116,9 +116,9 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  --animate-profile-gate: profile-gate 0.5s ease-out;
+  --animate-fade-in-scale: fade-in-scale 0.5s ease-out;
 
-  @keyframes profile-gate {
+  @keyframes fade-in-scale {
     from {
       opacity: 0;
       transform: scale(1.1);

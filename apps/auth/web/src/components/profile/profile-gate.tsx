@@ -16,7 +16,7 @@ export function ProfileGate() {
       <div
         key={editing ? 'edit' : 'select'}
         className={cn(
-          'flex flex-col items-center animate-profile-gate transition-opacity duration-500 max-w-4/5',
+          'flex flex-col items-center animate-fade-in-scale transition-opacity duration-500 max-w-4/5',
           addOpen && 'pointer-events-none opacity-0',
         )}
       >
