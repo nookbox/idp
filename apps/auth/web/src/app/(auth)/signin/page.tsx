@@ -1,18 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
-import { z } from 'zod';
-import { toast } from 'sonner';
+import { SubmitButton } from '@/components/button';
+import { FloatingLabelInput } from '@/components/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
 import { useCurrentSearch } from '@/lib/use-current-search';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
 const SAVED_EMAIL_KEY = 'auth:saved-email';
 
@@ -90,7 +90,7 @@ export default function SignInPage() {
   }
 
   return (
-    <div>
+    <div className="max-w-md w-full">
       <div className="pb-2">
         <h1 className="scroll-m-20 text-center text-4xl font-extrabold tracking-tight text-balance">
           로그인 정보를 입력하세요
@@ -100,10 +100,10 @@ export default function SignInPage() {
         </h2>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4  ">
         <div className="space-y-1.5">
-          <Label htmlFor="email">이메일 주소</Label>
-          <Input
+          <FloatingLabelInput
+            labelName="이메일"
             id="email"
             type="email"
             autoComplete="email"
@@ -113,9 +113,10 @@ export default function SignInPage() {
             <p className="text-xs text-destructive">{errors.email.message}</p>
           )}
         </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="password">비밀번호</Label>
-          <Input
+          <FloatingLabelInput
+            labelName="비밀번호"
             id="password"
             type="password"
             autoComplete="current-password"
@@ -140,9 +141,9 @@ export default function SignInPage() {
             이메일 저장
           </Label>
         </div>
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? '로그인 중...' : '로그인'}
-        </Button>
+        <SubmitButton loading={loading} loadingText="로그인 중">
+          로그인
+        </SubmitButton>
       </form>
 
       <div className="text-sm text-muted-foreground text-center mt-4 flex gap-2 justify-center">

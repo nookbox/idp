@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
 import { useCurrentSearch } from '@/lib/use-current-search';
-import { Button } from '@/components/ui/button';
+import { SubmitButton } from '@/components/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -110,9 +110,9 @@ export default function SignUpPage() {
             </p>
           )}
         </div>
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? '가입 중...' : '가입하기'}
-        </Button>
+        <SubmitButton loading={loading} loadingText="가입 중">
+          가입하기
+        </SubmitButton>
       </form>
       <p className="text-sm text-muted-foreground text-center">
         이미 계정이 있으신가요?{' '}
