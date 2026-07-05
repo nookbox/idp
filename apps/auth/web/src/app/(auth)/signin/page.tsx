@@ -82,7 +82,7 @@ export default function SignInPage() {
     if (redirectUrl) {
       window.location.assign(redirectUrl);
     } else {
-      router.push('/profiles');
+      router.push('/');
     }
   }
 

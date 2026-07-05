@@ -1,5 +1,7 @@
 'use client';
 
+// TODO: 다른 RP 서비스로 옮길예정
+// 일단 만들어놓은게 아까워서 그냥 둚
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProfileGate } from '@/components/profile';

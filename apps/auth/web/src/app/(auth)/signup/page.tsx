@@ -71,7 +71,7 @@ export default function SignUpPage() {
     if (redirectUrl) {
       window.location.assign(redirectUrl);
     } else {
-      router.push('/profiles');
+      router.push('/');
     }
   }
 
