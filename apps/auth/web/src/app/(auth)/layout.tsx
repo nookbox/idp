@@ -6,11 +6,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <div className="flex absolute inset-0 bg-[radial-gradient(ellipse_at_center,#1B1136_0%,#0B0B14_70%)] flex-col">
       <Header />
-      <main className="flex min-h-dvh items-center justify-center p-4 absolute inset-0 bg-[radial-gradient(ellipse_at_center,#1B1136_0%,#0B0B14_70%)]">
-        {children}
-      </main>
-    </>
+      <main className="flex flex-1 justify-center px-4">{children}</main>
+    </div>
   );
 }

@@ -90,9 +90,9 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="max-w-md w-full">
+    <div className="max-w-md w-full pt-10">
       <div className="pb-2">
-        <h1 className="scroll-m-20 text-center text-4xl font-extrabold tracking-tight text-balance">
+        <h1 className="scroll-m-20 text-3xl font-extrabold tracking-tight text-balance ">
           로그인 정보를 입력하세요
         </h1>
         <h2 className="text-lg/10 font-semibold text-white/70 ">
