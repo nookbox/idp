@@ -50,6 +50,15 @@ export const auth = betterAuth({
     provider: 'pg',
   }),
   trustedOrigins,
+  user: {
+    additionalFields: {
+      marketingConsent: {
+        type: 'boolean',
+        defaultValue: false,
+        input: true, // 회원가입 시 클라이언트가 값을 보낼 수 있게 허용
+      },
+    },
+  },
   emailAndPassword: { enabled: true, minPasswordLength: 8 },
   disabledPaths: ['/token'],
   plugins: [

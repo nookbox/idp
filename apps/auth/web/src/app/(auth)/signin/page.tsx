@@ -49,13 +49,12 @@ type FormValues = z.infer<typeof schema>;
 export default function SignInPage() {
   const router = useRouter();
   const currentSearch = useCurrentSearch();
-  const [loading, setLoading] = useState(false);
   const [saveEmail, setSaveEmail] = useState(() => !!getSavedEmail());
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: standardSchemaResolver(schema),
     defaultValues: { email: getSavedEmail(), password: '' },
@@ -68,12 +67,10 @@ export default function SignInPage() {
       localStorage.removeItem(SAVED_EMAIL_KEY);
     }
 
-    setLoading(true);
     const { data, error } = await authClient.signIn.email({
       email: values.email,
       password: values.password,
     });
-    setLoading(false);
 
     if (error) {
       console.error('Login error:', error);
@@ -141,7 +138,7 @@ export default function SignInPage() {
             이메일 저장
           </Label>
         </div>
-        <SubmitButton loading={loading} loadingText="로그인 중">
+        <SubmitButton loading={isSubmitting} loadingText="로그인 중">
           로그인
         </SubmitButton>
       </form>

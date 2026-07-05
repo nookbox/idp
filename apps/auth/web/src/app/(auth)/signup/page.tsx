@@ -58,6 +58,7 @@ export default function SignUpPage() {
       email: values.email,
       password: values.password,
       name: values.name,
+      marketingConsent: values.marketing,
     });
 
     if (error) {
@@ -70,7 +71,7 @@ export default function SignUpPage() {
     if (redirectUrl) {
       window.location.assign(redirectUrl);
     } else {
-      router.push('/signin');
+      router.push('/profiles');
     }
   }
 
@@ -190,7 +191,7 @@ export default function SignUpPage() {
             htmlFor="marketing"
             className="text-sm font-normal cursor-pointer leading-relaxed"
           >
-            특별 프로모션 이메일을 보내주세요. (선택 사항)
+            NOOKBOX의 특별 프로모션 이메일을 보내주세요. (선택 사항)
           </Label>
         </div>
 
