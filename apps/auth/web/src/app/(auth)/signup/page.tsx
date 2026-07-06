@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
+import { nameSchema } from '@/lib/name-schema';
 import { useCurrentSearch } from '@/lib/use-current-search';
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import Link from 'next/link';
@@ -21,10 +22,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 
 const schema = z.object({
-  name: z
-    .string()
-    .min(1, '이름을 입력해주세요')
-    .regex(/^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/, '올바른 이름을 입력해주세요'),
+  name: nameSchema,
   email: z.string().email('올바른 이메일을 입력해주세요'),
   password: z
     .string()

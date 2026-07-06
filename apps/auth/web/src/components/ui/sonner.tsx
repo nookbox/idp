@@ -1,21 +1,27 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
+      position="bottom-center"
+      closeButton
+      style={
+        {
+          '--normal-bg': '#141414',
+          '--normal-text': '#ffffff',
+          '--normal-border': 'transparent',
+          '--border-radius': '18px',
+        } as React.CSSProperties
+      }
+      icons={{
+        success: <Check strokeWidth={3} className="size-5 text-white" />,
+      }}
       toastOptions={{
-        classNames: {
-          toast:
-            'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
-          description: 'group-[.toast]:text-muted-foreground',
-          actionButton:
-            'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
-          cancelButton:
-            'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
-        },
+        style: { padding: '20px 26px', fontSize: '17px', gap: '14px' },
       }}
       {...props}
     />

@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -144,5 +144,55 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+[data-sonner-toast] {
+  width: max-content !important;
+  max-width: min(90vw, 640px) !important;
+  height: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) var(--y) !important;
+}
+[data-sonner-toast] [data-close-button] {
+  position: static !important;
+  order: 99 !important;
+  margin-left: 12px !important;
+  flex-shrink: 0 !important;
+  transform: none !important;
+  background: transparent !important;
+  border: none !important;
+  color: inherit !important;
+  width: 32px !important;
+  height: 32px !important;
+}
+[data-sonner-toast] [data-close-button] svg {
+  width: 20px;
+  height: 20px;
+}
+[data-sonner-toast] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 모바일: 토스트 크기 축소 (인라인 스타일보다 우선하도록 !important) */
+@media (max-width: 600px) {
+  [data-sonner-toast] {
+    max-width: calc(100vw - 32px) !important;
+    padding: 13px 18px !important;
+    font-size: 14px !important;
+    gap: 10px !important;
+  }
+  [data-sonner-toast] [data-close-button] {
+    width: 26px !important;
+    height: 26px !important;
+    margin-left: 8px !important;
+  }
+  [data-sonner-toast] [data-close-button] svg {
+    width: 16px;
+    height: 16px;
+  }
+  [data-sonner-toast] [data-icon] svg {
+    width: 16px;
+    height: 16px;
   }
 }

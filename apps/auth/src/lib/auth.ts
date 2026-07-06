@@ -18,15 +18,39 @@ const trustedOrigins = [
   ...new Set([authServerUrl, authWebUrl, ...corsOrigins]),
 ];
 
+// 완성형 한글·영문만 (자음/모음 단독 불가), 단어 사이 단일 공백만 허용
+const NAME_PATTERN = /^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/;
+
 const passwordPolicyPlugin = {
   id: 'password-policy' as const,
   hooks: {
     before: [
       {
-        matcher: (ctx: { path?: string }) => ctx.path === '/sign-up/email',
+        matcher: (ctx: { path?: string }) =>
+          ctx.path === '/sign-up/email' || ctx.path === '/update-user',
         handler: createAuthMiddleware(async (ctx) => {
-          const password = (ctx.body as Record<string, unknown> | undefined)
-            ?.password;
+          const name = (ctx.body as Record<string, unknown> | undefined)?.name;
+          if (typeof name !== 'string') return;
+
+          if (
+            name.trim() !== name ||
+            name.length < 2 ||
+            name.length > 30 ||
+            !NAME_PATTERN.test(name)
+          ) {
+            throw new APIError('BAD_REQUEST', {
+              message:
+                '이름은 한글·영문 2~30자여야 합니다 (자음·모음 단독, 앞뒤 공백 불가).',
+            });
+          }
+        }),
+      },
+      {
+        matcher: (ctx: { path?: string }) =>
+          ctx.path === '/sign-up/email' || ctx.path === '/change-password',
+        handler: createAuthMiddleware(async (ctx) => {
+          const body = ctx.body as Record<string, unknown> | undefined;
+          const password = body?.password ?? body?.newPassword;
           if (typeof password !== 'string') return;
 
           if (!/\d/.test(password)) {
