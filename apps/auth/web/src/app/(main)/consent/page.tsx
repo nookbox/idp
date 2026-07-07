@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
-import { useCurrentSearch } from '@/lib/use-current-search';
 
 type ConsentResponse = {
   redirect?: boolean;
@@ -13,15 +13,15 @@ type ConsentResponse = {
 export default function ConsentPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<'accept' | 'deny' | null>(null);
-  const currentSearch = useCurrentSearch();
+  const searchParams = useSearchParams();
 
-  const { clientId, scope } = useMemo(() => {
-    const params = new URLSearchParams(currentSearch);
-    return {
-      clientId: params.get('client_id') ?? '',
-      scope: params.get('scope') ?? '',
-    };
-  }, [currentSearch]);
+  const { clientId, scope } = useMemo(
+    () => ({
+      clientId: searchParams.get('client_id') ?? '',
+      scope: searchParams.get('scope') ?? '',
+    }),
+    [searchParams],
+  );
 
   const scopes = useMemo(
     () =>

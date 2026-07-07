@@ -11,10 +11,9 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
+import AuthLink from '@/components/link/auth-link';
 import { nameSchema } from '@/lib/name-schema';
-import { useCurrentSearch } from '@/lib/use-current-search';
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -37,7 +36,6 @@ type FormValues = z.infer<typeof schema>;
 
 export default function SignUpPage() {
   const router = useRouter();
-  const currentSearch = useCurrentSearch();
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
   const {
@@ -200,12 +198,9 @@ export default function SignUpPage() {
 
       <div className="text-sm text-muted-foreground text-center mt-4 flex gap-2 justify-center">
         이미 계정이 있으신가요?
-        <Link
-          href={`/signin${currentSearch}`}
-          className="underline hover:text-foreground"
-        >
+        <AuthLink href="/signin" className="underline hover:text-foreground">
           로그인
-        </Link>
+        </AuthLink>
       </div>
 
       <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}>
