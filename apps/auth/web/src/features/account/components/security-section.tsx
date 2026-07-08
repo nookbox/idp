@@ -55,8 +55,10 @@ export function SecuritySection() {
   };
 
   return (
-    <SectionCard title="비밀번호 변경">
-      <form onSubmit={changePassword} className="space-y-4 px-5 py-5">
+    <section className="py-2.5">
+      <p className="text-sm font-medium">비밀번호 변경</p>
+
+      <form onSubmit={changePassword} className="space-y-4 py-5">
         <FloatingLabelInput
           id="current-password"
           labelName="현재 비밀번호"
@@ -104,6 +106,6 @@ export function SecuritySection() {
           비밀번호 변경
         </SubmitButton>
       </form>
-    </SectionCard>
+    </section>
   );
 }
