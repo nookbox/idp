@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { UAParser } from 'ua-parser-js';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
@@ -15,30 +18,10 @@ type SessionItem = {
   updatedAt: Date | string;
 };
 
-// ponytail: 대표 브라우저/OS만 구분하는 최소 파서, 더 정밀하게 필요해지면 ua-parser-js
 function describeUserAgent(ua?: string | null) {
   if (!ua) return '알 수 없는 기기';
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /Chrome\//.test(ua)
-      ? 'Chrome'
-      : /Safari\//.test(ua)
-        ? 'Safari'
-        : /Firefox\//.test(ua)
-          ? 'Firefox'
-          : '브라우저';
-  const os = /Windows/.test(ua)
-    ? 'Windows'
-    : /Mac OS X/.test(ua)
-      ? 'macOS'
-      : /Android/.test(ua)
-        ? 'Android'
-        : /iPhone|iPad/.test(ua)
-          ? 'iOS'
-          : /Linux/.test(ua)
-            ? 'Linux'
-            : 'OS';
-  return `${os} · ${browser}`;
+  const { browser, os } = UAParser(ua);
+  return [os.name, browser.name].filter(Boolean).join(' · ') || '알 수 없는 기기';
 }
 
 export function DevicesSection({
@@ -92,7 +75,11 @@ export function DevicesSection({
               <span className="flex flex-wrap items-center gap-2">
                 {s.ipAddress || 'IP 알 수 없음'}
                 <span>
-                  · {new Date(s.updatedAt).toLocaleString('ko-KR')} 활동
+                  ·{' '}
+                  {format(new Date(s.updatedAt), 'yyyy.MM.dd a h:mm', {
+                    locale: ko,
+                  })}{' '}
+                  활동
                 </span>
                 {isCurrent && (
                   <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs text-violet-400">
