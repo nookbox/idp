@@ -29,14 +29,14 @@ export function AccountPage() {
       <h1 className="mb-8 text-3xl font-bold">계정</h1>
 
       <div className="flex flex-col gap-10 md:flex-row">
-        <nav className="flex shrink-0 gap-1 overflow-x-auto md:w-52 md:flex-col">
+        <nav className="flex md:flex-col">
           {SECTIONS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
               onClick={() => setSection(key)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm whitespace-nowrap transition-colors cursor-pointer',
+                'flex items-center gap-2 rounded-lg px-2 md:px-4 py-2.5 text-sm whitespace-nowrap transition-colors cursor-pointer',
                 section === key
                   ? 'bg-accent font-semibold'
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
