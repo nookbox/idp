@@ -63,6 +63,14 @@ export function OverviewSection({ user }: { user: User }) {
     const { error } = await authClient.updateUser({
       marketingConsent: checked,
     });
+    toast.success(
+      checked
+        ? '마케팅 정보 수신에 동의했습니다'
+        : '마케팅 정보 수신을 거부했습니다',
+      {
+        duration: 3000,
+      },
+    );
     if (error) {
       setMarketing(!checked);
       toast.error(error.message ?? '설정 변경에 실패했습니다');
