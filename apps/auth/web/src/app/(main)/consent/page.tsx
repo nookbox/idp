@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
 
@@ -10,7 +10,23 @@ type ConsentResponse = {
   redirectURI?: string;
 };
 
+// useSearchParams는 프리렌더 시점에 값이 없으므로 Suspense 경계 안에 있어야 하고,
+// 그렇지 않으면 프로덕션 빌드(next build)가 실패한다.
 export default function ConsentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-8">
+          <p className="text-sm text-gray-500">불러오는 중...</p>
+        </div>
+      }
+    >
+      <ConsentForm />
+    </Suspense>
+  );
+}
+
+function ConsentForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<'accept' | 'deny' | null>(null);
   const searchParams = useSearchParams();

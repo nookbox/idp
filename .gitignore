@@ -12,6 +12,10 @@ dist/
 # env
 .env
 .env*.local
+# 운영 시크릿. .env.prod.example(템플릿)만 커밋한다.
+.env.prod
+.env.prod.*
+!.env.prod.example
 
 # logs
 npm-debug.log*

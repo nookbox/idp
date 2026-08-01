@@ -1,0 +1,98 @@
+name: nook-idp-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      # 이름있는 볼륨. 컨테이너를 지워도 데이터는 남는다.
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------
+  # 마이그레이션 — 일회성. 평소엔 뜨지 않는다(profiles).
+  #
+  #   docker compose --env-file .env.prod -f docker-compose.prod.yml \
+  #     --profile migrate run --rm migrate
+  # ---------------------------------------------------------
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ['migrate']
+    restart: 'no'
+
+  # ---------------------------------------------------------
+  # IdP 서버 (NestJS)
+  # ---------------------------------------------------------
+  auth:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # 호스트가 아니라 컨테이너 이름 "postgres"로 부른다
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      # ⚠️ 여기가 issuer의 근거가 되는 "공개 주소"다.
+      # 브라우저가 실제로 접속할 수 있는 주소여야 한다.
+      BETTER_AUTH_URL: ${PUBLIC_AUTH_URL}
+      WEB_URL: ${PUBLIC_WEB_URL}
+      CORS_ORIGIN: ${PUBLIC_WEB_URL}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+    ports:
+      # 아직 터널이 없으므로 호스트 포트를 연다.
+      # 개발용 3001과 겹치지 않게 기본값을 8081로 둔다.
+      - '${AUTH_HOST_PORT:-8081}:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ---------------------------------------------------------
+  # 로그인/동의 UI (Next.js)
+  # ---------------------------------------------------------
+  auth-web:
+    build:
+      context: .
+      dockerfile: apps/auth/web/Dockerfile
+      args:
+        # ⚠️ NEXT_PUBLIC_* 은 빌드 시점에 번들에 박힌다.
+        # 이 값을 바꾸면 반드시 --build 로 이미지를 다시 만들어야 한다.
+        NEXT_PUBLIC_AUTH_URL: ${PUBLIC_AUTH_URL}
+    restart: unless-stopped
+    ports:
+      # 개발용 3000과 겹치지 않게 기본값 8080
+      - '${WEB_HOST_PORT:-8080}:3000'
+    depends_on:
+      - auth
+
+volumes:
+  postgres-data:

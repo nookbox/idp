@@ -1,0 +1,30 @@
+# 도커 빌드는 이 폴더 전체를 데몬에 "전송"한 뒤 시작한다.
+# 여기 적은 것들은 전송 자체가 안 되므로 빌드가 빨라지고, 실수로 이미지에 섞이지 않는다.
+
+# 의존성 — 컨테이너 안에서 새로 설치한다. 호스트(macOS/arm64) 바이너리를 쓰면 안 됨
+node_modules
+**/node_modules
+
+# 빌드 산출물 — 컨테이너 안에서 새로 빌드한다
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+
+# 비밀값 — 절대 이미지에 굽지 않는다. 런타임 환경변수로 주입
+.env
+**/.env
+**/.env.*
+!**/.env.example
+
+# 나머지 잡동사니
+.git
+.github
+**/coverage
+**/*.log
+.DS_Store
+**/.vscode
+**/.idea
+**/Dockerfile
+.dockerignore
+docker-compose*.yml
