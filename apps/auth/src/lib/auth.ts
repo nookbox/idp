@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { createAuthMiddleware, APIError } from 'better-auth/api';
-import { jwt } from 'better-auth/plugins';
+import { jwt, admin } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { db } from '../database/client';
@@ -92,7 +92,10 @@ export const auth = betterAuth({
         keyPairConfig: { alg: 'RS256' },
       },
     }),
+    admin(),
     oauthProvider({
+      clientPrivileges: async ({ user }) =>
+        (user as { role?: string | null }).role === 'admin',
       loginPage: `${authWebUrl}/signin`,
       consentPage: `${authWebUrl}/consent`,
       signup: {

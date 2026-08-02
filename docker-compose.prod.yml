@@ -57,9 +57,9 @@ services:
       CORS_ORIGIN: ${PUBLIC_WEB_URL}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
     ports:
-      # 아직 터널이 없으므로 호스트 포트를 연다.
-      # 개발용 3001과 겹치지 않게 기본값을 8081로 둔다.
-      - '${AUTH_HOST_PORT:-8081}:3001'
+      # 외부 노출은 cloudflared 가 담당한다. 여기서는 127.0.0.1 에만 묶어
+      # 서버에서 curl 로 찔러보는 용도로만 남긴다. 홈 네트워크에 열리지 않는다.
+      - '127.0.0.1:${AUTH_HOST_PORT:-8081}:3001'
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,10 +89,39 @@ services:
     environment:
       AUTH_INTERNAL_URL: http://auth:3001
     ports:
-      # 개발용 3000과 겹치지 않게 기본값 8080
-      - '${WEB_HOST_PORT:-8080}:3000'
+      # auth 와 같은 이유로 로컬 전용. 외부는 cloudflared 가 처리한다.
+      - '127.0.0.1:${WEB_HOST_PORT:-8080}:3000'
     depends_on:
       - auth
+
+  # ---------------------------------------------------------
+  # Cloudflare Tunnel
+  #
+  # 인바운드 포트를 하나도 열지 않고 외부에 서비스를 노출한다.
+  # cloudflared 가 Cloudflare 쪽으로 아웃바운드 연결을 맺고 그 위로 트래픽을 받는다.
+  # 그래서 공유기 포트포워딩도, 고정 IP도, DDNS 도 필요 없다.
+  #
+  # 어느 호스트명을 어디로 보낼지(ingress)는 대시보드에서 설정한다:
+  #   Zero Trust → 네트워크 → 터널 → macmini-home → 게시된 애플리케이션 경로
+  #
+  #   id.nook-box.com    → HTTP → auth-web:3000
+  #   auth.nook-box.com  → HTTP → auth:3001
+  #
+  # ⚠️ 대시보드에 넣는 주소는 호스트가 아니라 "컨테이너 이름:내부포트" 다.
+  #    cloudflared 가 같은 compose 네트워크 안에 있어서 직접 닿는다.
+  #    호스트에 launchd 데몬으로 설치하면(sudo cloudflared service install)
+  #    compose 네트워크 밖이라 localhost:8080 을 써야 하니 혼동하지 말 것.
+  # ---------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # --no-autoupdate: 컨테이너는 이미지 태그를 올려서 갱신하는 게 맞다.
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - auth
+      - auth-web
 
 volumes:
   postgres-data:

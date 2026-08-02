@@ -46,7 +46,7 @@ import { eq } from 'drizzle-orm';
 
 import { auth } from '../src/lib/auth';
 import { db, sql } from '../src/database/client';
-import { oauthClient } from '../src/database/schema';
+import { oauthClient, user } from '../src/database/schema';
 
 interface ClientSeed {
   name: string;
@@ -154,6 +154,16 @@ async function ensureSeedUserSessionCookie(): Promise<string> {
   } catch {
     // 이미 가입된 케이스
   }
+
+  // 시드 유저를 admin 으로 승격시킨다.
+  // oauthProvider 의 clientPrivileges 가 role === 'admin' 만 통과시키므로
+  // 이 단계가 없으면 아래 adminCreateOAuthClient 가 401 로 막힌다.
+  // role 은 better-auth 쪽에서 input:false 라 가입 요청으로는 못 넣고,
+  // /admin/set-role 을 부르려면 이미 admin 이어야 해서 DB 로 직접 심는다.
+  await db
+    .update(user)
+    .set({ role: 'admin' })
+    .where(eq(user.email, SEED_EMAIL));
 
   // 로그인해서 Set-Cookie 헤더를 얻는다.
   const response = await auth.api.signInEmail({
