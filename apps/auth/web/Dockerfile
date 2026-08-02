@@ -3,8 +3,12 @@
 # @nook/auth-web (Next.js 로그인/동의 화면) 운영 이미지
 #
 #   docker build -f apps/auth/web/Dockerfile \
-#     --build-arg NEXT_PUBLIC_AUTH_URL=https://auth.example.com \
+#     --build-arg NEXT_PUBLIC_AUTH_URL=https://id.example.com \
 #     -t nook-auth-web .
+#
+# NEXT_PUBLIC_AUTH_URL 은 auth 의 공개 주소인데, 운영에서는 auth-web 과 같은
+# 오리진이다(리버스 프록시가 /api/auth/* 만 auth 로 보낸다).
+# 별도 호스트로 쪼개면 세션 쿠키가 그 호스트에만 묶여 로그인이 깨진다.
 #
 # 빌드 컨텍스트는 워크스페이스 루트다(apps/auth/web 아님).
 

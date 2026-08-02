@@ -52,9 +52,19 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       # ⚠️ 여기가 issuer의 근거가 되는 "공개 주소"다.
       # 브라우저가 실제로 접속할 수 있는 주소여야 한다.
-      BETTER_AUTH_URL: ${PUBLIC_AUTH_URL}
-      WEB_URL: ${PUBLIC_WEB_URL}
-      CORS_ORIGIN: ${PUBLIC_WEB_URL}
+      #
+      # auth-web과 auth가 같은 오리진(PUBLIC_ORIGIN)을 쓴다. 경로로 나뉜다:
+      #   /api/auth/*  → auth (이 컨테이너)
+      #   그 외         → auth-web
+      # 세션 쿠키를 그 한 호스트에 host-only로 묶기 위한 구성이다.
+      # 호스트를 auth-web(id)과 auth(auth)로 쪼개면 쿠키가 auth 호스트에만
+      # 저장되어 auth-web의 서버 컴포넌트가 세션을 못 읽고 로그인 화면으로
+      # 되돌아온다.
+      # 서브도메인 공유 쿠키(crossSubDomainCookies)로 우회할 수도 있지만,
+      # 그러면 IdP 세션 토큰이 모든 서브도메인의 RP 서버로 함께 전송된다.
+      BETTER_AUTH_URL: ${PUBLIC_ORIGIN}
+      WEB_URL: ${PUBLIC_ORIGIN}
+      CORS_ORIGIN: ${PUBLIC_ORIGIN}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
     ports:
       # 외부 노출은 cloudflared 가 담당한다. 여기서는 127.0.0.1 에만 묶어
@@ -77,14 +87,15 @@ services:
       start_period: 20s
 
   # ---------------------------------------------------------
-  # 로그인/동의 UI (Next.js)
+  # auth-web — 로그인/동의 화면 (Next.js)
   # ---------------------------------------------------------
   auth-web:
     build:
       context: .
       dockerfile: apps/auth/web/Dockerfile
       args:
-        NEXT_PUBLIC_AUTH_URL: ${PUBLIC_AUTH_URL}
+        # 브라우저가 auth를 부를 주소. 단일 오리진이므로 auth-web 주소와 동일하다.
+        NEXT_PUBLIC_AUTH_URL: ${PUBLIC_ORIGIN}
     restart: unless-stopped
     environment:
       AUTH_INTERNAL_URL: http://auth:3001
@@ -104,8 +115,25 @@ services:
   # 어느 호스트명을 어디로 보낼지(ingress)는 대시보드에서 설정한다:
   #   Zero Trust → 네트워크 → 터널 → macmini-home → 게시된 애플리케이션 경로
   #
-  #   id.nook-box.com    → HTTP → auth-web:3000
-  #   auth.nook-box.com  → HTTP → auth:3001
+  # 호스트는 하나(PUBLIC_ORIGIN)만 쓰고 경로로 나눈다.
+  # ⚠️ 순서가 중요하다. 위에서부터 먼저 매칭되므로 catch-all 을 반드시 맨 아래 둔다.
+  #
+  #   호스트명            경로                                    → 서비스
+  #   ─────────────────────────────────────────────────────────────────────────
+  #   id.nook-box.com    api/auth/*                              → auth:3001
+  #   id.nook-box.com    .well-known/oauth-authorization-server/* → auth:3001
+  #   id.nook-box.com    (비움 = catch-all)                        → auth-web:3000
+  #
+  # ⚠️ 두 번째 규칙을 빼먹지 말 것. main.ts 가 RFC 8414 규칙 때문에
+  #    oauth-authorization-server 메타데이터를 /api/auth 밑이 아니라
+  #    /.well-known/oauth-authorization-server/api/auth 에 붙인다.
+  #    이 규칙이 없으면 그 경로가 Next 로 새서 404 가 되고,
+  #    RP 의 OIDC discovery 가 조용히 실패한다.
+  #
+  # ⚠️ 대시보드 경로 입력란은 앞 슬래시를 넣지 않는다(`api/auth/*`).
+  #
+  # ⚠️ 예전의 auth.nook-box.com 규칙은 지운다. 남겨두면 그 호스트로 로그인했을 때
+  #    쿠키가 다시 그쪽에 host-only 로 묶여 같은 증상이 재발한다.
   #
   # ⚠️ 대시보드에 넣는 주소는 호스트가 아니라 "컨테이너 이름:내부포트" 다.
   #    cloudflared 가 같은 compose 네트워크 안에 있어서 직접 닿는다.

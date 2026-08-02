@@ -8,9 +8,7 @@ export default function AuthLayout({
   return (
     <div className="flex absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,#1B1136_0%,#0B0B14_85%)] flex-col">
       <Header />
-      <main className="flex flex-1 justify-center px-4 items-center">
-        {children}
-      </main>
+      <main className="flex flex-1 justify-center px-4 ">{children}</main>
     </div>
   );
 }
