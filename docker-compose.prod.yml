@@ -84,10 +84,10 @@ services:
       context: .
       dockerfile: apps/auth/web/Dockerfile
       args:
-        # ⚠️ NEXT_PUBLIC_* 은 빌드 시점에 번들에 박힌다.
-        # 이 값을 바꾸면 반드시 --build 로 이미지를 다시 만들어야 한다.
         NEXT_PUBLIC_AUTH_URL: ${PUBLIC_AUTH_URL}
     restart: unless-stopped
+    environment:
+      AUTH_INTERNAL_URL: http://auth:3001
     ports:
       # 개발용 3000과 겹치지 않게 기본값 8080
       - '${WEB_HOST_PORT:-8080}:3000'
