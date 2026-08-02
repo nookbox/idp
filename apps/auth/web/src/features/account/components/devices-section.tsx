@@ -8,6 +8,11 @@ import { toast } from 'sonner';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { SectionCard, SectionRow } from './section-card';
 
 type SessionItem = {
@@ -21,7 +26,9 @@ type SessionItem = {
 function describeUserAgent(ua?: string | null) {
   if (!ua) return '알 수 없는 기기';
   const { browser, os } = UAParser(ua);
-  return [os.name, browser.name].filter(Boolean).join(' · ') || '알 수 없는 기기';
+  return (
+    [os.name, browser.name].filter(Boolean).join(' · ') || '알 수 없는 기기'
+  );
 }
 
 export function DevicesSection({
@@ -73,7 +80,16 @@ export function DevicesSection({
             label={describeUserAgent(s.userAgent)}
             description={
               <span className="flex flex-wrap items-center gap-2">
-                {s.ipAddress || 'IP 알 수 없음'}
+                {s.ipAddress ? (
+                  <Tooltip>
+                    <TooltipTrigger className="inline-block max-w-[140px] cursor-default truncate align-bottom">
+                      {s.ipAddress}
+                    </TooltipTrigger>
+                    <TooltipContent>{s.ipAddress}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  'IP 알 수 없음'
+                )}
                 <span>
                   ·{' '}
                   {format(new Date(s.updatedAt), 'yyyy.MM.dd a h:mm', {

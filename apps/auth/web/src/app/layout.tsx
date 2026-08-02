@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { Geist } from 'next/font/google';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className={cn('dark', 'font-sans', geist.variable)}>
       <body className="bg-background text-foreground min-h-screen">
-        {children}
+        <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
       </body>
     </html>
