@@ -37,6 +37,9 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/auth/package.json apps/auth/
 COPY apps/auth/web/package.json apps/auth/web/
+# @nook/email — auth가 workspace:* 로 의존한다.
+# package.json이 없으면 --frozen-lockfile 이 lock과 불일치로 터진다.
+COPY packages/email/package.json packages/email/
 
 # --frozen-lockfile: lock 파일과 조금이라도 다르면 에러. 재현성 보장
 # --filter "@nook/auth...": auth와 그 의존성만 설치 (Next.js 앱 의존성은 건너뜀)
@@ -51,9 +54,14 @@ FROM deps AS build
 
 COPY apps/auth/tsconfig.json apps/auth/tsconfig.build.json apps/auth/nest-cli.json apps/auth/
 COPY apps/auth/src apps/auth/src
+COPY packages/email/tsconfig.json packages/email/
+COPY packages/email/src packages/email/src
 
-# nest build → apps/auth/dist/ 에 순수 JS 생성
-RUN pnpm --filter @nook/auth build
+# "@nook/auth..." = auth + auth가 의존하는 워크스페이스 패키지들.
+# pnpm이 위상 순서로 돌려주므로 @nook/email(dist/)이 먼저 만들어지고,
+# 그 다음 nest build 가 실행된다. @nook/email의 main이 dist/index.js 라서
+# 순서가 뒤집히면 타입 해석부터 깨진다.
+RUN pnpm --filter "@nook/auth..." build
 
 # 운영에 필요한 것만 /out 으로 추출한다.
 # pnpm은 node_modules를 심볼릭 링크 그물로 엮어서 그냥 COPY하면 링크가 깨진다.
@@ -92,6 +100,30 @@ COPY apps/auth/src apps/auth/src
 
 WORKDIR /repo/apps/auth
 CMD ["pnpm", "exec", "drizzle-kit", "migrate"]
+
+# =============================================================
+# (별도) seed — RP(OAuth client) 등록 전용 이미지
+# =============================================================
+# tsx 도 devDependency 라 runner 에는 없다. migrate 와 같은 이유로 분리한다.
+#
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml \
+#     --profile seed run --rm seed
+#
+# deps 가 아니라 build 에서 출발하는 이유: 이 스크립트가 src/lib/auth 를 import 하고
+# 그게 @nook/email 을 끌어온다. @nook/email 의 main 은 dist/index.js 라서
+# 빌드가 끝난 스테이지가 아니면 import 부터 깨진다.
+#
+# ⚠️ 운영 postgres 는 호스트 포트를 열지 않는다. 그래서 맥에서 직접 못 돌리고
+#    compose 네트워크 안의 일회성 컨테이너로 돌려야 한다.
+#
+# ⚠️ client_secret 은 생성 시 딱 한 번만 평문으로 출력된다. 로그를 놓치면
+#    oauth_client 의 해당 row 를 지우고 다시 돌려서 새로 발급받는 수밖에 없다.
+FROM build AS seed
+
+COPY apps/auth/scripts apps/auth/scripts
+
+WORKDIR /repo/apps/auth
+CMD ["pnpm", "exec", "tsx", "scripts/seed-oauth-client.ts"]
 
 # =============================================================
 # 3단계: runner — 실제로 배포되는 이미지 (기본 타깃이라 맨 끝에 둔다)

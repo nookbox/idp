@@ -37,6 +37,37 @@ services:
     restart: 'no'
 
   # ---------------------------------------------------------
+  # RP(OAuth client) 등록 — 일회성. 평소엔 뜨지 않는다(profiles).
+  #
+  #   docker compose --env-file .env.prod -f docker-compose.prod.yml \
+  #     --profile seed run --rm seed
+  #
+  # 멱등이다. 이미 같은 이름으로 등록된 client 는 건너뛴다.
+  # ⚠️ 건너뛸 때 redirect_uris 는 갱신되지 않는다(로그아웃 설정만 갱신).
+  #    콜백 주소를 바꾸려면 oauth_client 를 직접 UPDATE 하거나 row 를 지우고 재실행.
+  # ---------------------------------------------------------
+  seed:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+      target: seed
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${PUBLIC_ORIGIN}
+      WEB_URL: ${PUBLIC_ORIGIN}
+      CORS_ORIGIN: ${PUBLIC_ORIGIN}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+      # 이걸 안 주면 localhost 기본값으로 등록되어 운영에서 redirect_uri_mismatch.
+      NOOK_OAUTH_CALLBACK_URIS: ${NOOK_OAUTH_CALLBACK_URIS}
+      NOOK_POST_LOGOUT_REDIRECT_URIS: ${NOOK_POST_LOGOUT_REDIRECT_URIS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ['seed']
+    restart: 'no'
+
+  # ---------------------------------------------------------
   # IdP 서버 (NestJS)
   # ---------------------------------------------------------
   auth:
@@ -115,14 +146,25 @@ services:
   # 어느 호스트명을 어디로 보낼지(ingress)는 대시보드에서 설정한다:
   #   Zero Trust → 네트워크 → 터널 → macmini-home → 게시된 애플리케이션 경로
   #
-  # 호스트는 하나(PUBLIC_ORIGIN)만 쓰고 경로로 나눈다.
+  # 호스트마다 오리진은 하나만 쓰고 경로로 나눈다.
   # ⚠️ 순서가 중요하다. 위에서부터 먼저 매칭되므로 catch-all 을 반드시 맨 아래 둔다.
+  #    (호스트가 다르면 서로 간섭하지 않는다. 순서는 같은 호스트 안에서만 문제다)
   #
   #   호스트명            경로                                    → 서비스
   #   ─────────────────────────────────────────────────────────────────────────
   #   id.nook-box.com    api/auth/*                              → auth:3001
   #   id.nook-box.com    .well-known/oauth-authorization-server/* → auth:3001
   #   id.nook-box.com    (비움 = catch-all)                        → auth-web:3000
+  #   nook-box.com       api/auth/*                              → nookbox-server:4000
+  #   nook-box.com       (비움 = catch-all)                        → nookbox-web:3030
+  #
+  # ⚠️ nookbox-* 는 이 compose 가 아니라 nookbox 레포의 스택이다(RP).
+  #    아래 nook-edge 네트워크로만 만난다. nookbox 스택이 안 떠 있으면
+  #    apex 로 들어온 요청은 502 가 된다. id.* 쪽은 영향 없다.
+  #
+  # ⚠️ nookbox 의 /users/* 같은 나머지 REST 는 뚫지 않는다.
+  #    web 의 서버 컴포넌트가 컨테이너 안에서만 부르기 때문이다(server-only).
+  #    브라우저가 직접 부르는 건 /api/auth/* 뿐이다.
   #
   # ⚠️ 두 번째 규칙을 빼먹지 말 것. main.ts 가 RFC 8414 규칙 때문에
   #    oauth-authorization-server 메타데이터를 /api/auth 밑이 아니라
@@ -150,6 +192,23 @@ services:
     depends_on:
       - auth
       - auth-web
+    networks:
+      # ⚠️ networks 를 한 번이라도 명시하면 default 는 자동으로 안 붙는다.
+      #    빼먹으면 auth/auth-web 을 못 찾아 id.* 가 통째로 죽는다.
+      - default
+      # nookbox(RP) 스택에 닿기 위한 공유 네트워크.
+      - nook-edge
 
 volumes:
   postgres-data:
+
+networks:
+  # nookbox 스택과 공유하는 네트워크. 양쪽 다 external 로 참조하므로
+  # compose 가 만들어주지 않는다. 최초 1회 직접 만들어야 한다:
+  #
+  #     docker network create nook-edge
+  #
+  # external 로 둔 이유: 어느 스택을 먼저 띄우든 순서를 안 타게 하려는 것.
+  # 한쪽이 소유하면 그쪽을 반드시 먼저 올려야 하고, down 하면 상대가 끊긴다.
+  nook-edge:
+    external: true

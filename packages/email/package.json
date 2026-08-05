@@ -1,0 +1,28 @@
+{
+  "name": "@nook/email",
+  "version": "0.1.0",
+  "private": true,
+  "description": "react-email 기반 이메일 템플릿 (렌더링만 담당, 발송은 소비자 앱이 처리)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "email dev --dir ./src/templates --port 3002",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-email/render": "^2.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-email": "^6.9.1"
+  },
+  "devDependencies": {
+    "@react-email/ui": "^6.9.1",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.7.3"
+  }
+}
