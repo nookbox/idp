@@ -1,5 +1,8 @@
 import { createAuthClient } from 'better-auth/react';
-import { inferAdditionalFields } from 'better-auth/client/plugins';
+import {
+  emailOTPClient,
+  inferAdditionalFields,
+} from 'better-auth/client/plugins';
 import { oauthProviderClient } from '@better-auth/oauth-provider/client';
 
 export const authClient = createAuthClient({
@@ -20,5 +23,6 @@ export const authClient = createAuthClient({
     // 모든 auth 요청 body 의 `oauth_query` 필드로 자동 첨부한다.
     // 백엔드 hook 이 sig 를 검증한 뒤 로그인 + authorize 이어주기를 처리.
     oauthProviderClient(),
+    emailOTPClient(),
   ],
 });

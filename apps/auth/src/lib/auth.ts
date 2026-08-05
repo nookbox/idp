@@ -1,9 +1,10 @@
 import { betterAuth } from 'better-auth';
 import { createAuthMiddleware, APIError } from 'better-auth/api';
-import { jwt, admin } from 'better-auth/plugins';
+import { jwt, admin, emailOTP } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { db } from '../database/client';
+import { OTP_EXPIRES_IN_SECONDS, sendOtpEmail } from './mailer';
 
 const authServerUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3001';
 const authWebUrl = process.env.WEB_URL ?? 'http://localhost:3000';
@@ -86,6 +87,24 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: true, minPasswordLength: 8 },
   disabledPaths: ['/token'],
   plugins: [
+    emailOTP({
+      otpLength: 6,
+      expiresIn: OTP_EXPIRES_IN_SECONDS,
+      storeOTP: 'hashed',
+      overrideDefaultEmailVerification: true,
+
+      sendVerificationOTP({ email, otp, type }) {
+        switch (type) {
+          case 'email-verification': // 계정 화면에서 사용자가 직접 요청
+          case 'sign-in': // 비밀번호 없이 코드로 로그인
+          case 'forget-password': // 비밀번호 재설정
+          case 'change-email': // 계정 이메일 주소 변경
+            void sendOtpEmail({ email, otp, purpose: type });
+            break;
+        }
+        return Promise.resolve();
+      },
+    }),
     passwordPolicyPlugin,
     jwt({
       jwks: {

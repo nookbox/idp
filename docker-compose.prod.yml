@@ -97,6 +97,10 @@ services:
       WEB_URL: ${PUBLIC_ORIGIN}
       CORS_ORIGIN: ${PUBLIC_ORIGIN}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+      # OTP 인증 코드 메일 발송. 둘 다 없으면 컨테이너가 부팅에서 죽는다
+      # (mailer.ts 에서 의도적으로 fail-fast). 메일 없이는 아무도 가입을 못 끝낸다.
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
     ports:
       # 외부 노출은 cloudflared 가 담당한다. 여기서는 127.0.0.1 에만 묶어
       # 서버에서 curl 로 찔러보는 용도로만 남긴다. 홈 네트워크에 열리지 않는다.
