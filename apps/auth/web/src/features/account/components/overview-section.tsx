@@ -143,11 +143,11 @@ export function OverviewSection({ user }: { user: User }) {
             </div>
           ) : (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => setEditingName(true)}
             >
-              변경
+              변경하기
             </Button>
           )}
         </SectionRow>
@@ -168,7 +168,18 @@ export function OverviewSection({ user }: { user: User }) {
               )}
             </span>
           }
-        />
+        >
+          <div className="flex shrink-0 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              // TODO: 이메일 인증 기능 구현후 여기에 작성하기
+              // onClick={() => setEditingName(true)}
+            >
+              인증하기
+            </Button>
+          </div>
+        </SectionRow>
       </SectionCard>
 
       <SectionCard title="수신 설정">
