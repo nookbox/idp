@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { toast } from 'sonner';
@@ -23,9 +23,19 @@ type User = {
   marketingConsent?: boolean;
 };
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 export function OverviewSection({ user }: { user: User }) {
   const [editingName, setEditingName] = useState(false);
   const [marketing, setMarketing] = useState(user.marketingConsent ?? false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   const {
     register,
@@ -56,6 +66,27 @@ export function OverviewSection({ user }: { user: User }) {
     setEditingName(false);
     reset({ name });
     toast.success('이름이 변경되었습니다');
+  };
+
+  const sendVerificationOtp = async () => {
+    setSendingOtp(true);
+    const { error } = await authClient.emailOtp.sendVerificationOtp({
+      email: user.email,
+      type: 'email-verification',
+    });
+    setSendingOtp(false);
+
+    if (error) {
+      toast.error(error.message ?? '인증 코드 전송에 실패했습니다');
+      return;
+    }
+    setCooldown(RESEND_COOLDOWN_SECONDS);
+
+    toast.success('인증 코드를 보냈습니다', {
+      description: '메일이 보이지 않으면 스팸함도 확인해 주세요',
+      classNames: { description: 'text-white/55! text-[15px]!' },
+      duration: 5000,
+    });
   };
 
   const toggleMarketing = async (checked: boolean) => {
@@ -169,16 +200,18 @@ export function OverviewSection({ user }: { user: User }) {
             </span>
           }
         >
-          <div className="flex shrink-0 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              // TODO: 이메일 인증 기능 구현후 여기에 작성하기
-              // onClick={() => setEditingName(true)}
-            >
-              인증하기
-            </Button>
-          </div>
+          {!user.emailVerified && (
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={sendingOtp || cooldown > 0}
+                onClick={sendVerificationOtp}
+              >
+                {cooldown > 0 ? `재전송 (${cooldown}초)` : '인증하기'}
+              </Button>
+            </div>
+          )}
         </SectionRow>
       </SectionCard>
 

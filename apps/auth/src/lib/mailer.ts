@@ -8,7 +8,7 @@ const logger = new Logger('Mailer');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-export const OTP_EXPIRES_IN_SECONDS = 600;
+export const OTP_EXPIRES_IN_SECONDS = 20; // 테스트용, 추후 600으로 변경
 export const OTP_EXPIRES_IN_MINUTES = OTP_EXPIRES_IN_SECONDS / 60;
 
 const apiKey = process.env.RESEND_API_KEY;
@@ -25,17 +25,20 @@ if (isProduction && !apiKey) {
     'RESEND_API_KEY 가 없습니다. OTP 메일을 보낼 수 없으므로 기동을 중단합니다.',
   );
 }
+if (!apiKey) {
+  logger.warn(
+    'RESEND_API_KEY 가 없습니다. 메일은 발송되지 않고 OTP 가 이 콘솔에 출력됩니다.',
+  );
+} else if (!process.env.EMAIL_FROM) {
+  logger.warn(
+    `EMAIL_FROM 이 없어 기본값(${from})을 씁니다. 이 주소는 Resend 가입 계정 본인 메일로만 발송됩니다.`,
+  );
+}
 
 const resend = apiKey ? new Resend(apiKey) : null;
 
 /**
  * OTP 메일 발송.
- *
- * ⚠️ 이 함수는 절대 throw 하지 않는다.
- *    better-auth 는 "이메일 발송을 await 하지 말라"고 권고한다. 발송 성공 여부가
- *    응답 시간에 드러나면 공격자가 그 차이로 가입된 주소인지 알아낼 수 있기 때문이다.
- *    그래서 호출부는 결과를 기다리지 않고, 실패는 여기서 로그로만 남긴다.
- *    대신 메일이 안 갔는데 API 는 200 을 주므로, 이 error 로그를 반드시 모니터링해야 한다.
  */
 export async function sendOtpEmail(params: {
   email: string;
