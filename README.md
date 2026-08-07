@@ -14,3 +14,8 @@ pnpm install
 pnpm dev        # auth 서버 + 로그인 web 동시 실행
 ```
 
+## 기록
+
+만들면서 내린 결정과 그때의 생각은 [위키](https://github.com/nookbox/idp/wiki)에 남긴다.
+
+- [FSD로 패턴 변경](https://github.com/nookbox/idp/wiki/FSD로-패턴-변경) — `entities` 레이어를 두고 FSD에 더 가까운 구조로
