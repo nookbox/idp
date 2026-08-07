@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/shared/api/auth-client';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { SectionCard, SectionRow } from './section-card';

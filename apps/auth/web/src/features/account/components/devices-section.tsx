@@ -5,7 +5,7 @@ import { UAParser } from 'ua-parser-js';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/shared/api/auth-client';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import {

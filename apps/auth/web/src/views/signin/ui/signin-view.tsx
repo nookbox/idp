@@ -1,7 +1,7 @@
 import AuthLink from '@/components/link/auth-link';
-import { SigninForm } from './components/signin-form';
+import { SigninForm } from './signin-form';
 
-export default function SignInPage() {
+export function SignInView() {
   return (
     <div className="max-w-md w-full pt-10">
       <div className="pb-2">

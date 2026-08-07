@@ -4,7 +4,7 @@ import { SubmitButton } from '@/components/button';
 import { FloatingLabelInput } from '@/components/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/shared/api/auth-client';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { SectionCard } from './section-card';

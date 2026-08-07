@@ -1,5 +1,5 @@
-import SignInPage from '@/features/signin';
+import { SignInView } from '@/views/signin';
 
-export default function SignIn() {
-  return <SignInPage />;
+export default function SignInPage() {
+  return <SignInView />;
 }

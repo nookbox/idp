@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { House, ShieldCheck, MonitorSmartphone, Blocks } from 'lucide-react';
-import { authClient } from '@/lib/auth-client';
-import { cn } from '@/lib/utils';
+import { authClient } from '@/shared/api/auth-client';
+import { cn } from '@/shared/lib/utils';
 import { OverviewSection } from './components/overview-section';
 import { SecuritySection } from './components/security-section';
 import { DevicesSection } from './components/devices-section';

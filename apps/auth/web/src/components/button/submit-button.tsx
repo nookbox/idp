@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/lib/utils';
 
 interface Props extends React.ComponentProps<typeof Button> {
   loading: boolean;

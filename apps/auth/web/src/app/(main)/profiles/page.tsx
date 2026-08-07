@@ -5,7 +5,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProfileGate } from '@/components/profile';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/shared/api/auth-client';
 
 export default function ProfilesPage() {
   const router = useRouter();

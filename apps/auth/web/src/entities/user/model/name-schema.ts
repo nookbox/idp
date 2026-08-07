@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 // 완성형 한글·영문만 허용 (자음/모음 단독 불가), 단어 사이 단일 공백만 허용
-// 서버 검증(apps/auth/src/lib/auth.ts inputPolicyPlugin)과 동일하게 유지
 export const nameSchema = z
   .string()
   .trim()

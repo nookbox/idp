@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ProfileList } from './profile-list';
 import { Button } from '../ui/button';
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/lib/utils';
 import { OpenAddProfileProvider } from './context/profile-gate-context';
 import { AddProfileDialog } from './add-profile';
 

@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/shared/api/auth-client';
 import { AccountPage } from '@/features/account';
 
 export default async function Home() {

@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Geist } from 'next/font/google';
-import { cn } from '@/lib/utils';
+import { cn } from '@/shared/lib/utils';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 

@@ -2,7 +2,7 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { authClient } from '@/lib/auth-client';
+import { authClient } from '@/shared/api/auth-client';
 
 type ConsentResponse = {
   redirect?: boolean;
