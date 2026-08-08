@@ -2,6 +2,7 @@ import { oauthProviderClient } from '@better-auth/oauth-provider/client';
 import {
   emailOTPClient,
   inferAdditionalFields,
+  multiSessionClient,
 } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 
@@ -24,5 +25,6 @@ export const authClient = createAuthClient({
     // 백엔드 hook 이 sig 를 검증한 뒤 로그인 + authorize 이어주기를 처리.
     oauthProviderClient(),
     emailOTPClient(),
+    multiSessionClient(),
   ],
 });

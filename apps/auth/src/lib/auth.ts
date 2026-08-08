@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { createAuthMiddleware, APIError } from 'better-auth/api';
-import { jwt, admin, emailOTP } from 'better-auth/plugins';
+import { jwt, admin, emailOTP, multiSession } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { db } from '../database/client';
@@ -122,6 +122,7 @@ export const auth = betterAuth({
       },
     }),
     passwordPolicyPlugin,
+    multiSession({ maximumSessions: 5 }),
     jwt({
       jwks: {
         keyPairConfig: { alg: 'RS256' },
