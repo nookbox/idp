@@ -6,9 +6,14 @@ import {
   type OtpPurpose,
   type VerifyOtpProps,
 } from './templates/verify-otp';
+import {
+  VERIFY_EMAIL_LINK_SUBJECT,
+  VerifyEmailLink,
+  type VerifyEmailLinkProps,
+} from './templates/verify-email-link';
 
-export { OTP_COPY, VerifyOtp };
-export type { OtpPurpose, VerifyOtpProps };
+export { OTP_COPY, VerifyOtp, VERIFY_EMAIL_LINK_SUBJECT, VerifyEmailLink };
+export type { OtpPurpose, VerifyOtpProps, VerifyEmailLinkProps };
 
 /** 발송 라이브러리(Resend 등)에 그대로 넘길 수 있는 형태. */
 export interface RenderedEmail {
@@ -31,6 +36,21 @@ export async function renderVerifyOtp(
 
   return {
     subject: OTP_COPY[props.purpose].subject(props.otp),
+    html,
+    text,
+  };
+}
+
+export async function renderVerifyEmailLink(
+  props: VerifyEmailLinkProps,
+): Promise<RenderedEmail> {
+  const element = VerifyEmailLink(props);
+
+  const html = await render(element);
+  const text = toPlainText(html);
+
+  return {
+    subject: VERIFY_EMAIL_LINK_SUBJECT,
     html,
     text,
   };

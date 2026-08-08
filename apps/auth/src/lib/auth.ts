@@ -4,7 +4,12 @@ import { jwt, admin, emailOTP } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { db } from '../database/client';
-import { OTP_EXPIRES_IN_SECONDS, sendOtpEmail } from './mailer';
+import {
+  OTP_EXPIRES_IN_SECONDS,
+  VERIFY_LINK_EXPIRES_IN_SECONDS,
+  sendOtpEmail,
+  sendVerificationLinkEmail,
+} from './mailer';
 
 const authServerUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3001';
 const authWebUrl = process.env.WEB_URL ?? 'http://localhost:3000';
@@ -85,24 +90,35 @@ export const auth = betterAuth({
     },
   },
   emailAndPassword: { enabled: true, minPasswordLength: 8 },
+  emailVerification: {
+    expiresIn: VERIFY_LINK_EXPIRES_IN_SECONDS,
+    autoSignInAfterVerification: true,
+    async sendVerificationEmail({ user, url }) {
+      await sendVerificationLinkEmail({
+        email: user.email,
+        url,
+        userName: user.name,
+      });
+    },
+  },
   disabledPaths: ['/token'],
   plugins: [
     emailOTP({
       otpLength: 6,
       expiresIn: OTP_EXPIRES_IN_SECONDS,
       storeOTP: 'hashed',
-      overrideDefaultEmailVerification: true,
+      // overrideDefaultEmailVerification 을 켜면 이메일 인증이 링크 대신 OTP 로
+      // 나간다. 인증은 emailVerification(링크) 쪽에서 처리하므로 켜지 않는다.
 
-      sendVerificationOTP({ email, otp, type }) {
+      async sendVerificationOTP({ email, otp, type }) {
         switch (type) {
-          case 'email-verification': // 계정 화면에서 사용자가 직접 요청
+          case 'email-verification': // emailOtp API 를 직접 부를 때만 (기본 인증은 링크)
           case 'sign-in': // 비밀번호 없이 코드로 로그인
           case 'forget-password': // 비밀번호 재설정
           case 'change-email': // 계정 이메일 주소 변경
-            void sendOtpEmail({ email, otp, purpose: type });
+            await sendOtpEmail({ email, otp, purpose: type });
             break;
         }
-        return Promise.resolve();
       },
     }),
     passwordPolicyPlugin,

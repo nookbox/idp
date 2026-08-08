@@ -3,7 +3,11 @@ import { redirect } from 'next/navigation';
 import { authClient } from '@/shared/api/auth-client';
 import { AccountView } from '@/views/account';
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ verified?: string; error?: string }>;
+}) {
   const { data: session } = await authClient.getSession({
     fetchOptions: {
       headers: { cookie: (await headers()).get('cookie') ?? '' },
@@ -12,5 +16,7 @@ export default async function Home() {
 
   if (!session) redirect('/signin');
 
-  return <AccountView />;
+  const { verified, error } = await searchParams;
+
+  return <AccountView verified={verified === '1'} verificationError={error} />;
 }

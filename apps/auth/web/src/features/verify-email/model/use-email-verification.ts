@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { sendVerificationOtp } from '../api/send-verification-otp';
+import { sendVerificationEmail } from '../api/send-verification-email';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -16,7 +16,7 @@ export function useEmailVerification(email: string) {
 
   const send = async () => {
     setSending(true);
-    const { error } = await sendVerificationOtp(email);
+    const { error } = await sendVerificationEmail(email);
     setSending(false);
 
     if (error) {

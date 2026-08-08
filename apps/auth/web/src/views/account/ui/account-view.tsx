@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { House, ShieldCheck, MonitorSmartphone, Blocks } from 'lucide-react';
+import { useVerificationResult } from '@/features/verify-email';
 import { authClient } from '@/shared/api/auth-client';
 import { cn } from '@/shared/lib/utils';
 import { OverviewSection } from './overview-section';
@@ -18,9 +19,17 @@ const SECTIONS = [
 
 type SectionKey = (typeof SECTIONS)[number]['key'];
 
-export function AccountView() {
+export function AccountView({
+  verified = false,
+  verificationError,
+}: {
+  verified?: boolean;
+  verificationError?: string;
+}) {
   const [section, setSection] = useState<SectionKey>('overview');
   const { data: session } = authClient.useSession();
+
+  useVerificationResult({ verified, error: verificationError });
 
   if (!session) return null;
 
