@@ -131,6 +131,8 @@ services:
       args:
         # 브라우저가 auth를 부를 주소. 단일 오리진이므로 auth-web 주소와 동일하다.
         NEXT_PUBLIC_AUTH_URL: ${PUBLIC_ORIGIN}
+        # 계정 페이지에서 NOOKBOX 랜딩으로 나가는 링크의 목적지.
+        NEXT_PUBLIC_SERVICE_URL: ${SERVICE_ORIGIN}
     restart: unless-stopped
     environment:
       AUTH_INTERNAL_URL: http://auth:3001

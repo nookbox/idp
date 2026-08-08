@@ -31,17 +31,19 @@ export function AccountNav({ section, onSectionChange, onLogout }: Props) {
         </button>
       ))}
 
-      <Separator className="my-2" />
+      <div className="hidden md:block">
+        <Separator className="my-2" />
 
-      <button
-        type="button"
-        onClick={onLogout}
-        className="flex items-center gap-2 rounded-lg px-2 md:px-4 py-2.5 text-sm whitespace-nowrap transition-colors cursor-pointer
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex items-center gap-2 rounded-lg px-2 md:px-4 py-2.5 text-sm whitespace-nowrap transition-colors cursor-pointer
         text-muted-foreground hover:text-foreground"
-      >
-        <LogOut className="size-4" />
-        로그아웃
-      </button>
+        >
+          <LogOut className="size-4" />
+          로그아웃
+        </button>
+      </div>
     </nav>
   );
 }
