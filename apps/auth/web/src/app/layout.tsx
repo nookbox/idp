@@ -1,9 +1,9 @@
-import type { Metadata } from 'next';
-import './globals.css';
-import { Toaster } from '@/components/ui/sonner';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Geist } from 'next/font/google';
 import { cn } from '@/shared/lib/utils';
+import { Toaster } from '@/shared/ui/sonner';
+import { TooltipProvider } from '@/shared/ui/tooltip';
+import type { Metadata } from 'next';
+import { Geist } from 'next/font/google';
+import './globals.css';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 

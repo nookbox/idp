@@ -1,18 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { UAParser } from 'ua-parser-js';
+import { authClient } from '@/shared/api/auth-client';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { authClient } from '@/shared/api/auth-client';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { UAParser } from 'ua-parser-js';
+import { Button } from '@/shared/ui/button';
+import { Spinner } from '@/shared/ui/spinner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
 import { SectionCard, SectionRow } from './section-card';
 
 type SessionItem = {

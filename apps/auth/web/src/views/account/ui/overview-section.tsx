@@ -1,15 +1,16 @@
 'use client';
 
+import { nameSchema } from '@/entities/user';
+import { authClient } from '@/shared/api/auth-client';
+import { Button } from '@/shared/ui/button';
+import { Input } from '@/shared/ui/input';
+import { Switch } from '@/shared/ui/switch';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { authClient } from '@/shared/api/auth-client';
-import { nameSchema } from '@/entities/user';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { RESEND_COOLDOWN_SECONDS } from '../model/constants';
 import { SectionCard, SectionRow } from './section-card';
 
 const nameFormSchema = z.object({ name: nameSchema });
@@ -22,8 +23,6 @@ type User = {
   image?: string | null;
   marketingConsent?: boolean;
 };
-
-const RESEND_COOLDOWN_SECONDS = 60;
 
 export function OverviewSection({ user }: { user: User }) {
   const [editingName, setEditingName] = useState(false);

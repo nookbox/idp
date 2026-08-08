@@ -1,6 +1,6 @@
 'use client';
 
-import { SubmitButton } from '@/components/button';
+import { SubmitButton } from '@/shared/button';
 import { FloatingLabelInput } from '@/components/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';

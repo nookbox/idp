@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { House, ShieldCheck, MonitorSmartphone, Blocks } from 'lucide-react';
 import { authClient } from '@/shared/api/auth-client';
@@ -18,7 +16,7 @@ const SECTIONS = [
 
 type SectionKey = (typeof SECTIONS)[number]['key'];
 
-export function AccountPage() {
+export function AccountView() {
   const [section, setSection] = useState<SectionKey>('overview');
   const { data: session } = authClient.useSession();
 

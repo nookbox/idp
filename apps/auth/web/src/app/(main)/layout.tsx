@@ -1,4 +1,4 @@
-import { Header } from '@/components/header';
+import { Header } from '@/widgets/header';
 
 export default function MainLayout({
   children,
