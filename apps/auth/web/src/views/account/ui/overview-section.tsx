@@ -1,6 +1,7 @@
 'use client';
 
-import type { User } from '@/entities/user';
+import { type User } from '@/entities/user';
+import { UploadAvatar } from '@/features/upload-avatar';
 import { VerifyEmailButton } from '@/features/verify-email';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -16,18 +17,12 @@ export function OverviewSection({ user }: { user: User }) {
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-5">
-        {user.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.image}
-            alt={user.name}
-            className="size-20 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex size-20 items-center justify-center rounded-full bg-violet-600 text-3xl font-semibold text-white">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <UploadAvatar
+          user={user}
+          className="size-20"
+          fullbackClassname=" text-3xl"
+        />
+
         <div>
           <p className="text-xl font-semibold">{user.name}</p>
           <p className="text-muted-foreground text-sm">{user.email}</p>

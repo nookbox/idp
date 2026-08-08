@@ -2,6 +2,7 @@
 
 import { UserAvatar } from '@/entities/user';
 import { useLogout } from '@/features/logout';
+import { UploadAvatar } from '@/features/upload-avatar';
 import { authClient } from '@/shared/api/auth-client';
 import { Button } from '@/shared/ui/button';
 import {
@@ -21,7 +22,7 @@ export function UserMenu() {
 
   if (!session) return null;
 
-  const { name, email } = session.user;
+  const { email } = session.user;
 
   return (
     <DropdownMenu open modal={false}>
@@ -36,7 +37,17 @@ export function UserMenu() {
           <p className="text-gray-100 text-center text-xs">{email}</p>
         </DropdownMenuLabel>
 
-        <DropdownMenuSeparator />
+        <div className="flex justify-center items-center flex-col gap-2 py-2">
+          <UploadAvatar
+            user={session.user}
+            className="size-20"
+            fullbackClassname="text-3xl"
+          />
+
+          <div className="text-2xl font-normal">
+            안녕하세요, {session.user.name}님
+          </div>
+        </div>
 
         <DropdownMenuItem asChild>
           <Link href="/">

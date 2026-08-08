@@ -1,16 +1,20 @@
+import { cn } from '@/shared/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 import type { User } from '../model/types';
 
 interface Props {
   user: Pick<User, 'name' | 'image'>;
   className?: string;
+  fullbackClassname?: string;
 }
 
-export function UserAvatar({ user, className }: Props) {
+export function UserAvatar({ user, className, fullbackClassname }: Props) {
   return (
     <Avatar className={className}>
       {user.image && <AvatarImage src={user.image} alt={user.name} />}
-      <AvatarFallback className="bg-violet-600 font-semibold text-white">
+      <AvatarFallback
+        className={cn('font-semibold text-white', fullbackClassname)}
+      >
         {user.name.charAt(0).toUpperCase()}
       </AvatarFallback>
     </Avatar>
