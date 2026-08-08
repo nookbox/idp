@@ -1,17 +1,16 @@
 'use client';
 
 import type { User } from '@/entities/user';
+import { VerifyEmailButton } from '@/features/verify-email';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Switch } from '@/shared/ui/switch';
 import { useEditName } from '../model/use-edit-name';
-import { useEmailVerification } from '../model/use-email-verification';
 import { useMarketingConsent } from '../model/use-marketing-consent';
 import { SectionCard, SectionRow } from './section-card';
 
 export function OverviewSection({ user }: { user: User }) {
   const name = useEditName(user.name);
-  const email = useEmailVerification(user.email);
   const marketing = useMarketingConsent(user.marketingConsent ?? false);
 
   return (
@@ -102,16 +101,7 @@ export function OverviewSection({ user }: { user: User }) {
         >
           {!user.emailVerified && (
             <div className="flex shrink-0 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={email.sending || email.cooldown > 0}
-                onClick={email.send}
-              >
-                {email.cooldown > 0
-                  ? `재전송 (${email.cooldown}초)`
-                  : '인증하기'}
-              </Button>
+              <VerifyEmailButton email={user.email} />
             </div>
           )}
         </SectionRow>
