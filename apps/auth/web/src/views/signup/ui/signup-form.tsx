@@ -1,11 +1,11 @@
 'use client';
 
-import { SubmitButton } from '@/shared/button';
-import { FloatingLabelInput } from '@/components/input';
-import AuthLink from '@/components/link/auth-link';
-import { Checkbox } from '@/components/ui/checkbox';
-import { DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { SubmitButton } from '@/shared/ui/submit-button';
+import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
+import { AuthLink } from '@/shared/ui/auth-link';
+import { Checkbox } from '@/shared/ui/checkbox';
+import { DialogTrigger } from '@/shared/ui/dialog';
+import { Label } from '@/shared/ui/label';
 import { Controller } from 'react-hook-form';
 import { useSignupForm } from '../model/use-signup-form';
 import { PrivacyPolicyDialog } from './privacy-policy-dialog';

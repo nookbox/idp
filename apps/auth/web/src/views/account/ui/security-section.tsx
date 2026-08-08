@@ -1,64 +1,30 @@
 'use client';
 
-import { SubmitButton } from '@/shared/button';
-import { FloatingLabelInput } from '@/components/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { authClient } from '@/shared/api/auth-client';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import { SectionCard } from './section-card';
+import { Checkbox } from '@/shared/ui/checkbox';
+import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
+import { Label } from '@/shared/ui/label';
+import { SubmitButton } from '@/shared/ui/submit-button';
+import { useChangePassword } from '../model/use-change-password';
 
 export function SecuritySection() {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [revokeOthers, setRevokeOthers] = useState(true);
-  const [loading, setLoading] = useState(false);
-
-  const changePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (newPassword !== confirmPassword) {
-      toast.error('새 비밀번호가 서로 일치하지 않습니다', {});
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error('비밀번호는 8자 이상이어야 합니다', { duration: Infinity });
-      return;
-    }
-    if (!/\d/.test(newPassword) || !/[^a-zA-Z0-9]/.test(newPassword)) {
-      toast.error('비밀번호에 숫자와 특수문자가 포함되어야 합니다', {});
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await authClient.changePassword({
-      currentPassword,
-      newPassword,
-      revokeOtherSessions: revokeOthers,
-    });
-    setLoading(false);
-
-    if (error) {
-      toast.error(
-        error.code === 'INVALID_PASSWORD'
-          ? '현재 비밀번호가 올바르지 않습니다'
-          : (error.message ?? '비밀번호 변경에 실패했습니다'),
-      );
-      return;
-    }
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    toast.success('비밀번호가 업데이트되었습니다', { duration: Infinity });
-  };
+  const {
+    currentPassword,
+    setCurrentPassword,
+    newPassword,
+    setNewPassword,
+    confirmPassword,
+    setConfirmPassword,
+    revokeOthers,
+    setRevokeOthers,
+    loading,
+    submit,
+  } = useChangePassword();
 
   return (
     <section className="py-2.5">
       <p className="text-sm font-medium">비밀번호 변경</p>
 
-      <form onSubmit={changePassword} className="space-y-4 py-5">
+      <form onSubmit={submit} className="space-y-4 py-5">
         <FloatingLabelInput
           id="current-password"
           labelName="현재 비밀번호"

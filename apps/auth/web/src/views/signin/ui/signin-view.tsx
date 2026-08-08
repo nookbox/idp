@@ -1,4 +1,4 @@
-import AuthLink from '@/components/link/auth-link';
+import { AuthLink } from '@/shared/ui/auth-link';
 import { SigninForm } from './signin-form';
 
 export function SignInView() {

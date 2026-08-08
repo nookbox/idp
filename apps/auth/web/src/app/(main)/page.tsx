@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { authClient } from '@/shared/api/auth-client';
-import { AccountPage } from '@/features/account';
+import { AccountView } from '@/views/account';
 
 export default async function Home() {
   const { data: session } = await authClient.getSession({
@@ -12,5 +12,5 @@ export default async function Home() {
 
   if (!session) redirect('/signin');
 
-  return <AccountPage />;
+  return <AccountView />;
 }

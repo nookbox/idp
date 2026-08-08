@@ -1,9 +1,9 @@
 'use client';
 
-import { SubmitButton } from '@/shared/button';
-import { FloatingLabelInput } from '@/components/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
+import { SubmitButton } from '@/shared/ui/submit-button';
+import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
+import { Checkbox } from '@/shared/ui/checkbox';
+import { Label } from '@/shared/ui/label';
 import { useSigninForm } from '../model/use-signin-form';
 
 export function SigninForm() {

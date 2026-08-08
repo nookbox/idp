@@ -1,1 +1,0 @@
-export const RESEND_COOLDOWN_SECONDS = 60;

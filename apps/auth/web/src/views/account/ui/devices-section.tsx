@@ -1,62 +1,20 @@
 'use client';
 
-import { authClient } from '@/shared/api/auth-client';
-import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { UAParser } from 'ua-parser-js';
 import { Button } from '@/shared/ui/button';
 import { Spinner } from '@/shared/ui/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { describeUserAgent } from '../lib/describe-user-agent';
+import { useSessions } from '../model/use-sessions';
 import { SectionCard, SectionRow } from './section-card';
-
-type SessionItem = {
-  id: string;
-  token: string;
-  ipAddress?: string | null;
-  userAgent?: string | null;
-  updatedAt: Date | string;
-};
-
-function describeUserAgent(ua?: string | null) {
-  if (!ua) return '알 수 없는 기기';
-  const { browser, os } = UAParser(ua);
-  return (
-    [os.name, browser.name].filter(Boolean).join(' · ') || '알 수 없는 기기'
-  );
-}
 
 export function DevicesSection({
   currentSessionToken,
 }: {
   currentSessionToken: string;
 }) {
-  const [sessions, setSessions] = useState<SessionItem[] | null>(null);
-  const [revoking, setRevoking] = useState<string | null>(null);
-
-  useEffect(() => {
-    authClient.listSessions().then(({ data, error }) => {
-      if (error) {
-        toast.error(error.message ?? '세션 목록을 불러오지 못했습니다');
-        setSessions([]);
-        return;
-      }
-      setSessions(data as SessionItem[]);
-    });
-  }, []);
-
-  const revoke = async (token: string) => {
-    setRevoking(token);
-    const { error } = await authClient.revokeSession({ token });
-    setRevoking(null);
-    if (error) {
-      toast.error(error.message ?? '로그아웃에 실패했습니다');
-      return;
-    }
-    setSessions((prev) => prev?.filter((s) => s.token !== token) ?? null);
-    toast.success('해당 기기에서 로그아웃되었습니다');
-  };
+  const { sessions, revoking, revoke } = useSessions();
 
   if (!sessions) {
     return (

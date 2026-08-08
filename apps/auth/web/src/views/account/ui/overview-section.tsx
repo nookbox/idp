@@ -1,111 +1,18 @@
 'use client';
 
-import { nameSchema } from '@/entities/user';
-import { authClient } from '@/shared/api/auth-client';
+import type { User } from '@/entities/user';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Switch } from '@/shared/ui/switch';
-import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { RESEND_COOLDOWN_SECONDS } from '../model/constants';
+import { useEditName } from '../model/use-edit-name';
+import { useEmailVerification } from '../model/use-email-verification';
+import { useMarketingConsent } from '../model/use-marketing-consent';
 import { SectionCard, SectionRow } from './section-card';
 
-const nameFormSchema = z.object({ name: nameSchema });
-type NameFormValues = z.infer<typeof nameFormSchema>;
-
-type User = {
-  name: string;
-  email: string;
-  emailVerified: boolean;
-  image?: string | null;
-  marketingConsent?: boolean;
-};
-
 export function OverviewSection({ user }: { user: User }) {
-  const [editingName, setEditingName] = useState(false);
-  const [marketing, setMarketing] = useState(user.marketingConsent ?? false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const timer = setTimeout(() => setCooldown((s) => s - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [cooldown]);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<NameFormValues>({
-    resolver: standardSchemaResolver(nameFormSchema),
-    mode: 'onChange',
-    defaultValues: { name: user.name },
-  });
-
-  const cancelEditName = () => {
-    setEditingName(false);
-    reset({ name: user.name });
-  };
-
-  const saveName = async ({ name }: NameFormValues) => {
-    if (name === user.name) {
-      setEditingName(false);
-      return;
-    }
-    const { error } = await authClient.updateUser({ name });
-    if (error) {
-      toast.error(error.message ?? '이름 변경에 실패했습니다');
-      return;
-    }
-    setEditingName(false);
-    reset({ name });
-    toast.success('이름이 변경되었습니다');
-  };
-
-  const sendVerificationOtp = async () => {
-    setSendingOtp(true);
-    const { error } = await authClient.emailOtp.sendVerificationOtp({
-      email: user.email,
-      type: 'email-verification',
-    });
-    setSendingOtp(false);
-
-    if (error) {
-      toast.error(error.message ?? '인증 코드 전송에 실패했습니다');
-      return;
-    }
-    setCooldown(RESEND_COOLDOWN_SECONDS);
-
-    toast.success('인증 코드를 보냈습니다', {
-      description: '메일이 보이지 않으면 스팸함도 확인해 주세요',
-      classNames: { description: 'text-white/55! text-[15px]!' },
-      duration: 5000,
-    });
-  };
-
-  const toggleMarketing = async (checked: boolean) => {
-    setMarketing(checked);
-    const { error } = await authClient.updateUser({
-      marketingConsent: checked,
-    });
-    toast.success(
-      checked
-        ? '마케팅 정보 수신에 동의했습니다'
-        : '마케팅 정보 수신을 거부했습니다',
-      {
-        duration: 3000,
-      },
-    );
-    if (error) {
-      setMarketing(!checked);
-      toast.error(error.message ?? '설정 변경에 실패했습니다');
-    }
-  };
+  const name = useEditName(user.name);
+  const email = useEmailVerification(user.email);
+  const marketing = useMarketingConsent(user.marketingConsent ?? false);
 
   return (
     <div className="space-y-8">
@@ -132,19 +39,17 @@ export function OverviewSection({ user }: { user: User }) {
         <SectionRow
           label="이름"
           description={
-            editingName ? (
+            name.editing ? (
               <div className="mt-1 space-y-1">
                 <Input
-                  {...register('name')}
-                  onKeyDown={(e) =>
-                    e.key === 'Enter' && handleSubmit(saveName)()
-                  }
+                  {...name.register('name')}
+                  onKeyDown={(e) => e.key === 'Enter' && name.submit()}
                   className="h-9 max-w-xs"
                   autoFocus
                 />
-                {errors.name && (
+                {name.errors.name && (
                   <p className="text-destructive text-xs">
-                    {errors.name.message}
+                    {name.errors.name.message}
                   </p>
                 )}
               </div>
@@ -153,30 +58,26 @@ export function OverviewSection({ user }: { user: User }) {
             )
           }
         >
-          {editingName ? (
+          {name.editing ? (
             <div className="flex shrink-0 gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={isSubmitting}
-                onClick={cancelEditName}
+                disabled={name.isSubmitting}
+                onClick={name.cancel}
               >
                 취소
               </Button>
               <Button
                 size="sm"
-                disabled={isSubmitting}
-                onClick={handleSubmit(saveName)}
+                disabled={name.isSubmitting}
+                onClick={name.submit}
               >
                 저장
               </Button>
             </div>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditingName(true)}
-            >
+            <Button variant="outline" size="sm" onClick={name.start}>
               변경하기
             </Button>
           )}
@@ -204,10 +105,12 @@ export function OverviewSection({ user }: { user: User }) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={sendingOtp || cooldown > 0}
-                onClick={sendVerificationOtp}
+                disabled={email.sending || email.cooldown > 0}
+                onClick={email.send}
               >
-                {cooldown > 0 ? `재전송 (${cooldown}초)` : '인증하기'}
+                {email.cooldown > 0
+                  ? `재전송 (${email.cooldown}초)`
+                  : '인증하기'}
               </Button>
             </div>
           )}
@@ -219,7 +122,10 @@ export function OverviewSection({ user }: { user: User }) {
           label="마케팅 정보 수신"
           description="이벤트·혜택 소식을 이메일로 받아요"
         >
-          <Switch checked={marketing} onCheckedChange={toggleMarketing} />
+          <Switch
+            checked={marketing.enabled}
+            onCheckedChange={marketing.toggle}
+          />
         </SectionRow>
       </SectionCard>
     </div>

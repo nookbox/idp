@@ -22,7 +22,7 @@ function AuthLinkWithParams({ href, className, children }: AuthLinkProps) {
   );
 }
 
-export default function AuthLink({ href, className, children }: AuthLinkProps) {
+export function AuthLink({ href, className, children }: AuthLinkProps) {
   return (
     <Suspense
       // 프리렌더 시점엔 쿼리스트링을 알 수 없다. 쿼리 없는 링크를 먼저 그리고
