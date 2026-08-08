@@ -15,7 +15,3 @@ export function changePassword(params: {
 }) {
   return authClient.changePassword(params);
 }
-
-export function logout() {
-  return authClient.signOut();
-}

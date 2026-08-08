@@ -4,7 +4,6 @@ import { useVerificationResult } from '@/features/verify-email';
 import { authClient } from '@/shared/api/auth-client';
 import { useState } from 'react';
 import type { SectionKey } from '../model/types';
-import { useLogout } from '../model/use-logout';
 import { AccountNav } from './account-nav';
 import { DevicesSection } from './devices-section';
 import { OverviewSection } from './overview-section';
@@ -21,7 +20,6 @@ export function AccountView({
   const [section, setSection] = useState<SectionKey>('overview');
 
   const { data: session } = authClient.useSession();
-  const { logout } = useLogout();
 
   useVerificationResult({ verified, error: verificationError });
 
@@ -32,11 +30,7 @@ export function AccountView({
       <h1 className="mb-8 text-3xl font-bold">계정</h1>
 
       <div className="flex flex-col gap-10 md:flex-row">
-        <AccountNav
-          section={section}
-          onSectionChange={setSection}
-          onLogout={logout}
-        />
+        <AccountNav section={section} onSectionChange={setSection} />
 
         <div className="min-w-0 flex-1">
           {section === 'overview' && <OverviewSection user={session.user} />}
