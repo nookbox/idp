@@ -5,6 +5,8 @@ import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
 import { Spinner } from '@/shared/ui/spinner';
 import { XIcon } from 'lucide-react';
+import { useState } from 'react';
+import { accountId } from '../lib/account-id';
 import type { DeviceSession } from '../model/types';
 
 interface Props {
@@ -24,8 +26,37 @@ export function AccountRow({
   onSwitch,
   onRemove,
 }: Props) {
-  // admin 플러그인이 user 에 얹어주는 필드라 클라이언트 타입에는 없다
+  const [confirming, setConfirming] = useState(false);
+
   const isAdmin = (user as { role?: string | null }).role === 'admin';
+
+  if (confirming && !removing) {
+    return (
+      <div className="flex items-center gap-2 py-3 pr-2 pl-4 text-sm">
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium">{accountId(user.email)}</span> 계정을
+          제거할까요?
+        </span>
+
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="hover:bg-accent shrink-0 cursor-pointer rounded-md px-3 py-1.5"
+        >
+          취소
+        </button>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRemove}
+          className="text-destructive hover:bg-destructive/10 shrink-0 cursor-pointer rounded-md px-3 py-1.5 font-medium disabled:pointer-events-none disabled:opacity-60"
+        >
+          제거
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="group hover:bg-accent flex items-center pr-2 transition-colors">
@@ -33,7 +64,7 @@ export function AccountRow({
         type="button"
         disabled={busy}
         onClick={onSwitch}
-        className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left text-sm disabled:pointer-events-none disabled:opacity-60"
+        className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left text-sm disabled:pointer-events-none disabled:opacity-60 cursor-pointer"
       >
         <UserAvatar
           user={user}
@@ -52,11 +83,10 @@ export function AccountRow({
       <button
         type="button"
         disabled={busy}
-        onClick={onRemove}
+        onClick={() => setConfirming(true)}
         aria-label={`${user.name} 계정 제거`}
         className={cn(
-          'text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none',
-          // 전환·제거 중에는 hover 여부와 무관하게 스피너가 보여야 한다
+          'text-muted-foreground cursor-pointer  hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none',
           (switching || removing) && 'opacity-100',
         )}
       >

@@ -29,14 +29,14 @@ export function UserMenu() {
   const [accountsOpen, setAccountsOpen] = useState(false);
 
   const { data: session } = authClient.useSession();
-  const { loggingOut, logout } = useLogout();
+  const { loggingOut, logout } = useLogout('all');
 
   if (!session) return null;
 
   const { email } = session.user;
 
   return (
-    <DropdownMenu open={true} onOpenChange={setMenuOpen}>
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
           <UserAvatar user={session.user} />
@@ -45,7 +45,7 @@ export function UserMenu() {
 
       <DropdownMenuContent
         align="end"
-        className="w-svw h-screen  md:w-109 px-4  "
+        className="w-svw h-screen md:h-full  md:w-109 px-4  "
       >
         <DropdownMenuLabel className="grid grid-cols-[--spacing(10)_1fr_--spacing(10)] items-center font-normal">
           <span />

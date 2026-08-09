@@ -5,7 +5,7 @@ import { LogOut } from 'lucide-react';
 import { useLogout } from '../model/use-logout';
 
 export function LogoutBtn() {
-  const { loggingOut, logout } = useLogout();
+  const { loggingOut, logout } = useLogout('current');
 
   return (
     <button

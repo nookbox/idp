@@ -25,7 +25,7 @@ export function AccountSwitcher() {
           switching={switchingToken === account.session.token}
           removing={removingToken === account.session.token}
           onSwitch={() => switchTo(account.session.token)}
-          onRemove={() => remove(account.session.token, account.user.name)}
+          onRemove={() => remove(account.session.token, account.user.email)}
         />
       ))}
 

@@ -6,6 +6,7 @@ import {
   revokeDeviceSession,
   setActiveSession,
 } from '../api/device-sessions';
+import { accountId } from '../lib/account-id';
 import type { DeviceSession } from './types';
 
 export function useDeviceSessions() {
@@ -44,11 +45,10 @@ export function useDeviceSessions() {
       return;
     }
 
-    // 서버 컴포넌트(page.tsx 의 getSession)까지 새 세션으로 다시 그린다
     router.refresh();
   };
 
-  const remove = async (sessionToken: string, userName: string) => {
+  const remove = async (sessionToken: string, email: string) => {
     if (busy) return;
     setRemovingToken(sessionToken);
 
@@ -61,8 +61,16 @@ export function useDeviceSessions() {
     }
 
     setSessions((prev) => prev.filter((s) => s.session.token !== sessionToken));
-    toast.success(`${userName} 계정을 목록에서 제거했습니다`);
+    toast.success(`${accountId(email)} 계정을 목록에서 제거했습니다`);
   };
 
-  return { sessions, loading, busy, switchingToken, removingToken, switchTo, remove };
+  return {
+    sessions,
+    loading,
+    busy,
+    switchingToken,
+    removingToken,
+    switchTo,
+    remove,
+  };
 }
