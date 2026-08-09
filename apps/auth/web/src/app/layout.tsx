@@ -22,6 +22,11 @@ export default function RootLayout({
       <body className="bg-background text-foreground min-h-screen">
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
+
+        {/* TODO: footer 만들고 
+          <Button variant="outline" size="sm" className="mt-1" asChild>
+            <ExternalLink href={SERVICE_URL}>NOOKBOX 둘러보기</ExternalLink>
+          </Button> 추가 */}
       </body>
     </html>
   );
