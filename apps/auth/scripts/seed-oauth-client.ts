@@ -69,6 +69,9 @@ interface ClientSeed {
    * IdP 가 이 RP 에 back-channel logout 을 POST 할 주소.
    * 등록하지 않으면 통지를 받지 않는다(옵트인). 받을 서버가 없는 RP는 비워둔다.
    *
+   * 이 값을 넣으면 enable_end_session 도 true 여야 한다(id_token 의 sid 가 필요).
+   * assertLogoutConfigConsistent 참고.
+   *
    * ⚠️ 이건 브라우저가 아니라 IdP 서버가 부르는 주소다. nookbox 처럼 같은
    *    docker 네트워크(nook-edge)에 있으면 컨테이너 이름으로 바로 부를 수 있어
    *    터널에 경로를 뚫지 않아도 된다:
@@ -143,6 +146,37 @@ const SEED_EMAIL = 'admin@local.com';
 const SEED_PASSWORD =
   process.env.SEED_ADMIN_PASSWORD ?? 'seed-admin-password-change-me';
 const SEED_NAME = 'Seed Admin';
+
+/**
+ * back-channel logout 을 쓰려면 enable_end_session 이 반드시 같이 켜져 있어야 한다.
+ *
+ * id_token 의 sid 는 enable_end_session 이 true 인 client 에만 실린다
+ * (@better-auth/oauth-provider 의 createIdToken). 그런데 logout_token 에는
+ * enable_end_session 과 무관하게 sid 와 sub 가 둘 다 들어간다.
+ *
+ * 그래서 backchannel_logout_uri 만 켜고 enable_end_session 을 빠뜨리면:
+ *   로그인 시 sid 를 못 받음 → RP 가 sid ↔ 자기 세션 매핑을 만들 수 없음
+ *   → logout_token 의 sid 를 못 알아봄 → sub 로 폴백
+ *   → 노트북에서 로그아웃했는데 폰까지 같이 끊긴다.
+ *
+ * 에러 없이 세션 정책만 조용히 뒤집히는 종류의 사고라, 시드 단계에서 막는다.
+ */
+function assertLogoutConfigConsistent(clients: ClientSeed[]): void {
+  const broken = clients.filter(
+    (cfg) => cfg.backchannel_logout_uri !== undefined && !cfg.enable_end_session,
+  );
+
+  if (broken.length === 0) return;
+
+  const names = broken.map((cfg) => `  - ${cfg.name}`).join('\n');
+  throw new Error(
+    'backchannel_logout_uri 를 등록한 client 는 enable_end_session: true 여야 합니다.\n' +
+      `${names}\n` +
+      'enable_end_session 이 꺼져 있으면 id_token 에 sid 가 실리지 않아 RP 가 세션 단위\n' +
+      '로그아웃을 할 수 없고, sub 폴백으로 전 기기가 함께 로그아웃됩니다.\n' +
+      '세션 단위 로그아웃이 필요 없다면 backchannel_logout_uri 를 지우세요.',
+  );
+}
 
 async function applyClientLogoutConfig(
   clientId: string,
@@ -280,6 +314,9 @@ async function main(): Promise<void> {
     console.log('등록할 client 가 없습니다. CLIENTS 배열을 확인하세요.');
     return;
   }
+
+  // DB 를 건드리기 전에 검사한다. 절반만 반영된 상태를 만들지 않기 위해서다.
+  assertLogoutConfigConsistent(CLIENTS);
 
   const cookie = await ensureSeedUserSessionCookie();
 
