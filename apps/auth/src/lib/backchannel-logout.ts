@@ -7,8 +7,7 @@ const BACKCHANNEL_LOGOUT_EVENT =
 /** RP 가 죽어 있어도 로그아웃 자체는 끝나야 하므로 짧게 끊는다. */
 const NOTIFY_TIMEOUT_MS = 5000;
 
-/** logout_token 은 즉시 쓰고 버려진다. 길게 둘 이유가 없다. */
-const LOGOUT_TOKEN_TTL_SECONDS = 120;
+const LOGOUT_TOKEN_TTL_SECONDS = 120; // 2분
 
 function issuer(): string {
   const base = process.env.BETTER_AUTH_URL ?? 'http://localhost:3001';
