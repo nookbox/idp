@@ -35,6 +35,16 @@
  *     NOOK_OAUTH_CALLBACK_URIS=http://localhost:4000/cb,https://api.nook.com/cb
  *     NOOK_POST_LOGOUT_REDIRECT_URIS=http://localhost:3030,https://nook.com
  *
+ *   backchannel_logout_uri 만 성격이 다르다. 위 둘은 브라우저가 가는 곳이라
+ *   한 client 가 dev/prod 주소를 함께 들고 있어도 되지만, 이건 IdP 서버가
+ *   직접 POST 하는 주소라 지금 떠 있는 환경의 것 하나만 유효하다.
+ *   그래서 콤마 목록이 아니라 단일 URL 이다.
+ *
+ *     NOOK_BACKCHANNEL_LOGOUT_URI=http://nookbox-server:4000/api/auth/backchannel-logout
+ *
+ *   RP 가 여러 개면 client 마다 자기 변수를 갖는다(NOOK_*, STUDIO_*, ...).
+ *   IdP 는 backchannel_logout_uri 가 등록된 client 를 전부 찾아 각각 보낸다.
+ *
  *   ❌ BAD — 한 client 에 여러 서비스 URL 을 몰아넣음:
  *     { name: 'All Services', redirect_uris: [':4000/cb', ':5001/cb', ':6000/cb'] }
  *     → 모든 서비스가 같은 client_secret 공유 → 한 곳 침해 시 도미노
@@ -55,10 +65,19 @@ interface ClientSeed {
   require_pkce?: boolean;
   enable_end_session?: boolean;
   post_logout_redirect_uris?: string[];
+  /**
+   * IdP 가 이 RP 에 back-channel logout 을 POST 할 주소.
+   * 등록하지 않으면 통지를 받지 않는다(옵트인). 받을 서버가 없는 RP는 비워둔다.
+   *
+   * ⚠️ 이건 브라우저가 아니라 IdP 서버가 부르는 주소다. nookbox 처럼 같은
+   *    docker 네트워크(nook-edge)에 있으면 컨테이너 이름으로 바로 부를 수 있어
+   *    터널에 경로를 뚫지 않아도 된다:
+   *      http://nookbox-server:4000/api/auth/backchannel-logout
+   *    외부 RP 라면 공개 https 주소를 쓴다.
+   */
+  backchannel_logout_uri?: string;
   token_endpoint_auth_method?:
-    | 'client_secret_post'
-    | 'client_secret_basic'
-    | 'none';
+    'client_secret_post' | 'client_secret_basic' | 'none';
   type?: 'web' | 'native' | 'user-agent-based';
 }
 
@@ -89,6 +108,9 @@ const CLIENTS: ClientSeed[] = [
       'NOOK_POST_LOGOUT_REDIRECT_URIS',
       ['http://localhost:3030'],
     ),
+    backchannel_logout_uri:
+      process.env.NOOK_BACKCHANNEL_LOGOUT_URI ??
+      'http://localhost:4000/api/auth/backchannel-logout',
   },
   // 새 서비스가 생기면 client 를 추가:
   // {
@@ -103,6 +125,10 @@ const CLIENTS: ClientSeed[] = [
   //     'STUDIO_POST_LOGOUT_REDIRECT_URIS',
   //     ['http://localhost:3031'],
   //   ),
+  //   // RP 마다 자기 변수를 갖는다. 하나의 변수에 콤마로 몰지 않는다.
+  //   backchannel_logout_uri:
+  //     process.env.STUDIO_BACKCHANNEL_LOGOUT_URI ??
+  //     'http://localhost:5001/api/auth/backchannel-logout',
   // },
   // 외부 파트너용 (consent 화면을 사용자에게 보여줘야 함):
   // {
@@ -122,6 +148,29 @@ async function applyClientLogoutConfig(
   clientId: string,
   cfg: ClientSeed,
 ): Promise<void> {
+  if (
+    cfg.enable_end_session === undefined &&
+    cfg.post_logout_redirect_uris === undefined &&
+    cfg.backchannel_logout_uri === undefined
+  ) {
+    return;
+  }
+
+  // metadata 는 jsonb 라 통째로 덮으면 다른 키가 날아간다. 읽어서 병합한다.
+  let metadata: Record<string, unknown> | undefined;
+  if (cfg.backchannel_logout_uri !== undefined) {
+    const [existing] = await db
+      .select({ metadata: oauthClient.metadata })
+      .from(oauthClient)
+      .where(eq(oauthClient.clientId, clientId))
+      .limit(1);
+
+    metadata = {
+      ...((existing?.metadata as Record<string, unknown> | null) ?? {}),
+      backchannel_logout_uri: cfg.backchannel_logout_uri,
+    };
+  }
+
   const updates = {
     ...(cfg.enable_end_session !== undefined
       ? { enableEndSession: cfg.enable_end_session }
@@ -129,15 +178,9 @@ async function applyClientLogoutConfig(
     ...(cfg.post_logout_redirect_uris !== undefined
       ? { postLogoutRedirectUris: cfg.post_logout_redirect_uris }
       : {}),
+    ...(metadata !== undefined ? { metadata } : {}),
     updatedAt: new Date(),
   };
-
-  if (
-    cfg.enable_end_session === undefined &&
-    cfg.post_logout_redirect_uris === undefined
-  ) {
-    return;
-  }
 
   await db
     .update(oauthClient)
@@ -202,6 +245,7 @@ async function seedOne(cfg: ClientSeed, cookie: string): Promise<void> {
       enable_end_session: cfg.enable_end_session ?? existing.enableEndSession,
       post_logout_redirect_uris:
         cfg.post_logout_redirect_uris ?? existing.postLogoutRedirectUris,
+      backchannel_logout_uri: cfg.backchannel_logout_uri,
     });
     return;
   }

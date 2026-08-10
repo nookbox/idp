@@ -4,6 +4,7 @@ import { jwt, admin, emailOTP, multiSession } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { db } from '../database/client';
+import { notifyBackchannelLogout } from './backchannel-logout';
 import {
   OTP_EXPIRES_IN_SECONDS,
   VERIFY_LINK_EXPIRES_IN_SECONDS,
@@ -80,12 +81,37 @@ export const auth = betterAuth({
     provider: 'pg',
   }),
   trustedOrigins,
+  advanced: {
+    // 쿠키는 포트를 구분하지 않는다. 로컬에서 IdP 와 RP 가 둘 다 localhost 라
+    // 기본 이름을 쓰면 서로 덮어쓴다. RP 쪽과 반드시 다른 값이어야 한다.
+    cookiePrefix: 'nook-idp',
+  },
   user: {
     additionalFields: {
       marketingConsent: {
         type: 'boolean',
         defaultValue: false,
         input: true, // 회원가입 시 클라이언트가 값을 보낼 수 있게 허용
+      },
+    },
+  },
+  databaseHooks: {
+    session: {
+      // 세션 행이 지워질 때마다 RP 에 알린다(행 단위. 계정 3개면 3번).
+      // 엔드포인트가 아니라 DB 레이어에 거는 이유는, 세션을 지우는 API 가
+      // /sign-out 말고도 여럿이라(계정 제거, 기기 종료, 비번 변경, 탈퇴...)
+      // 하나씩 걸면 빠뜨리기 때문. 여기는 그것들이 다 거쳐가는 길목이다.
+      delete: {
+        after: (session) => {
+          // 기다리지 않는다. RP 가 죽어 있으면 타임아웃까지 붙잡히고,
+          // 여러 행이 한 번에 지워지면 그만큼 쌓인다. 실패는 안에서 삼킨다.
+          void notifyBackchannelLogout({
+            id: session.id,
+            userId: session.userId,
+          });
+
+          return Promise.resolve();
+        },
       },
     },
   },
