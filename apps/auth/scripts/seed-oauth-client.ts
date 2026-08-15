@@ -43,7 +43,8 @@
  *     NOOK_BACKCHANNEL_LOGOUT_URI=http://nookbox-server:4000/api/auth/backchannel-logout
  *
  *   RP 가 여러 개면 client 마다 자기 변수를 갖는다(NOOK_*, STUDIO_*, ...).
- *   IdP 는 backchannel_logout_uri 가 등록된 client 를 전부 찾아 각각 보낸다.
+ *   통지는 끝난 세션에서 실제로 토큰을 발급받은 client 에만 간다. 등록만 해두고
+ *   유저가 로그인한 적 없는 RP 는 통지를 받지 않는다.
  *
  *   ❌ BAD — 한 client 에 여러 서비스 URL 을 몰아넣음:
  *     { name: 'All Services', redirect_uris: [':4000/cb', ':5001/cb', ':6000/cb'] }

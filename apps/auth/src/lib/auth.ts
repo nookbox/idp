@@ -4,7 +4,11 @@ import { jwt, admin, emailOTP, multiSession } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
 import { db } from '../database/client';
-import { notifyBackchannelLogout } from './backchannel-logout';
+import {
+  findBackchannelTargets,
+  notifyBackchannelLogout,
+  type BackchannelTarget,
+} from './backchannel-logout';
 import {
   OTP_EXPIRES_IN_SECONDS,
   VERIFY_LINK_EXPIRES_IN_SECONDS,
@@ -24,6 +28,13 @@ const corsOrigins = (process.env.CORS_ORIGIN ?? '')
 const trustedOrigins = [
   ...new Set([authServerUrl, authWebUrl, ...corsOrigins]),
 ];
+
+/**
+ * 세션 삭제 훅의 before -> after 사이에서만 산다. 세션 id 로 넣고 바로 뺀다.
+ * DELETE 자체가 터지면 after 가 안 돌아 항목이 남지만, 행당 문자열 몇 개라
+ * 무시할 만하고 그 상황이면 이미 DB 가 죽은 거다.
+ */
+const pendingTargets = new Map<string, BackchannelTarget[]>();
 
 // 완성형 한글·영문만 (자음/모음 단독 불가), 단어 사이 단일 공백만 허용
 const NAME_PATTERN = /^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/;
@@ -102,12 +113,30 @@ export const auth = betterAuth({
       // /sign-out 말고도 여럿이라(계정 제거, 기기 종료, 비번 변경, 탈퇴...)
       // 하나씩 걸면 빠뜨리기 때문. 여기는 그것들이 다 거쳐가는 길목이다.
       delete: {
+        // 통지 대상은 여기서 뽑아둬야 한다. oauth_access_token / oauth_refresh_token
+        // 의 session_id 가 onDelete: 'set null' 이라, 행이 지워진 뒤엔 이 세션이
+        // 어느 RP 에 물려 있었는지 알 방법이 없다.
+        before: async (session) => {
+          try {
+            pendingTargets.set(
+              session.id,
+              await findBackchannelTargets(session.id),
+            );
+          } catch (error) {
+            console.error('[backchannel-logout] 통지 대상 조회 실패:', error);
+          }
+        },
         after: (session) => {
+          const targets = pendingTargets.get(session.id);
+          pendingTargets.delete(session.id);
+          if (!targets) return Promise.resolve();
+
           // 기다리지 않는다. RP 가 죽어 있으면 타임아웃까지 붙잡히고,
           // 여러 행이 한 번에 지워지면 그만큼 쌓인다. 실패는 안에서 삼킨다.
           void notifyBackchannelLogout({
             id: session.id,
             userId: session.userId,
+            targets,
           });
 
           return Promise.resolve();
