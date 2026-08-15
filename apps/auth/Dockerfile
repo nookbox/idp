@@ -107,7 +107,11 @@ CMD ["pnpm", "exec", "drizzle-kit", "migrate"]
 # tsx 도 devDependency 라 runner 에는 없다. migrate 와 같은 이유로 분리한다.
 #
 #   docker compose --env-file .env.prod -f docker-compose.prod.yml \
-#     --profile seed run --rm seed
+#     --profile seed run --rm --build seed
+#
+# ⚠️ --build 를 빼면 안 된다. compose run 은 이미지가 있으면 그대로 쓴다.
+#    등록할 client 목록이 이 이미지 안에 COPY 된 스크립트에 들어있어서,
+#    옛 이미지로 돌리면 옛 설정으로 등록되고도 성공한 것처럼 끝난다.
 #
 # deps 가 아니라 build 에서 출발하는 이유: 이 스크립트가 src/lib/auth 를 import 하고
 # 그게 @nook/email 을 끌어온다. @nook/email 의 main 은 dist/index.js 라서

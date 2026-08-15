@@ -21,7 +21,11 @@ services:
   # 마이그레이션 — 일회성. 평소엔 뜨지 않는다(profiles).
   #
   #   docker compose --env-file .env.prod -f docker-compose.prod.yml \
-  #     --profile migrate run --rm migrate
+  #     --profile migrate run --rm --build migrate
+  #
+  # ⚠️ --build 를 빼면 안 된다. compose run 은 이미지가 있으면 그대로 쓴다.
+  #    스키마는 이미지 안에 COPY 된 src 에서 읽으므로, 옛 이미지로 돌리면
+  #    옛 스키마와 DB 를 비교해 "No changes detected" 를 내고 조용히 끝난다.
   # ---------------------------------------------------------
   migrate:
     build:
@@ -40,7 +44,10 @@ services:
   # RP(OAuth client) 등록 — 일회성. 평소엔 뜨지 않는다(profiles).
   #
   #   docker compose --env-file .env.prod -f docker-compose.prod.yml \
-  #     --profile seed run --rm seed
+  #     --profile seed run --rm --build seed
+  #
+  # ⚠️ 여기도 --build 필수. 등록할 client 목록이 이미지 안 스크립트에 들어있어,
+  #    옛 이미지로 돌리면 옛 설정으로 등록된다.
   #
   # 멱등이다. 이미 같은 이름으로 등록된 client 는 건너뛴다.
   # ⚠️ 건너뛸 때 redirect_uris 는 갱신되지 않는다(로그아웃 설정만 갱신).
