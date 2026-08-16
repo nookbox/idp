@@ -34,6 +34,9 @@ async function bootstrap(): Promise<void> {
 
   app.use(RequestIdMiddleware);
 
+  // 모든 Nest 컨트롤러를 /api 밑으로 모은다.
+  app.setGlobalPrefix('api', { exclude: ['health'] });
+
   // OIDC / OAuth 2.0 디스커버리 메타데이터.
   // issuer path가 /api/auth이므로 RFC 8414/OIDC Discovery 규칙에 맞춰
   //  - openid-configuration: issuer path 뒤에 .well-known을 붙임

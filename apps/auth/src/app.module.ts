@@ -9,6 +9,7 @@ import {
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './health.controller';
 import { AuthModule } from './modules/auth/auth.module';
+import { AvatarsModule } from './modules/avatars/avatars.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthModule } from './modules/auth/auth.module';
     }),
     DatabaseModule,
     AuthModule,
+    AvatarsModule,
   ],
   controllers: [HealthController],
   providers: [

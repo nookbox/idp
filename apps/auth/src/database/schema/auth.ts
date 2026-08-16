@@ -13,7 +13,11 @@ export const user = pgTable('user', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
-  image: text('image'),
+  image: text('image'), // 이미지 절대 URL
+  // 아바타 파일 위치. AVATAR_DIR 기준 상대 경로 "{userId}/{내용해시}.webp"
+  // 절대경로 금지 — base 만 갈아끼워 R2 로 옮기기 위한 것이다.
+  imageKey: text('image_key'),
+  imageSource: text('image_source'), // 'upload' | 'google' | null
   marketingConsent: boolean('marketing_consent').default(false).notNull(),
   role: text('role'),
   banned: boolean('banned').default(false),

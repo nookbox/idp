@@ -111,6 +111,12 @@ services:
       # (mailer.ts 에서 의도적으로 fail-fast). 메일 없이는 아무도 가입을 못 끝낸다.
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM: ${EMAIL_FROM}
+      # 아바타 파일을 저장할 컨테이너 안 경로. 아래 volumes 의 마운트 지점과
+      # 반드시 같아야 한다.
+      AVATAR_DIR: /data/avatars
+    volumes:
+      # 아바타 원본 파일. 이름있는 볼륨이 아니라 바인드 마운트를 쓴다.
+      - ${AVATAR_HOST_DIR}:/data/avatars
     ports:
       # 외부 노출은 cloudflared 가 담당한다. 여기서는 127.0.0.1 에만 묶어
       # 서버에서 curl 로 찔러보는 용도로만 남긴다. 홈 네트워크에 열리지 않는다.

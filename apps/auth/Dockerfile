@@ -79,8 +79,6 @@ RUN pnpm --filter @nook/auth deploy --prod --legacy /out
 # (제거 후 실제로 부팅되는지 아래 HEALTHCHECK와 별개로 반드시 실행 검증할 것)
 RUN rm -rf /out/node_modules/.pnpm/next@* \
            /out/node_modules/.pnpm/@next+* \
-           /out/node_modules/.pnpm/@img+* \
-           /out/node_modules/.pnpm/sharp@* \
            /out/node_modules/next \
            /out/node_modules/@next
 
