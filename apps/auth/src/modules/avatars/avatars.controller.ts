@@ -1,34 +1,18 @@
-import { createDiskStorage } from '@/shared/storage/disk.storage';
-import {
-  Controller,
-  ParseFilePipeBuilder,
-  Post,
-  UploadedFile,
-  UseInterceptors,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { Session, UserSession } from '@thallesp/nestjs-better-auth';
+import { Controller, ParseFilePipe, Post, UploadedFile } from '@nestjs/common';
 import { AvatarsService } from './avatars.service';
+import { ApiImageFile } from './decorators/api-image.decorator';
+import { FileTypeValidationPipe } from './pipes/file-type-validation.pipe';
 
 @Controller('avatars')
 export class AvatarsController {
   constructor(private readonly avatarsService: AvatarsService) {}
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: createDiskStorage('./uploads/profile'),
-    }),
-  )
-  @Post('avatar/upload')
-  uploadProfileImage(
-    @Session() session: UserSession,
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({ fileType: /jpeg|png|webp/ })
-        .addMaxSizeValidator({ maxSize: 5 * 1024 * 1024 })
-        .build(),
-    )
+
+  @Post('upload')
+  @ApiImageFile('avatar', true, {
+    limits: { fileSize: 5 * 1024 * 1024 },
+  })
+  changeProfile(
+    @UploadedFile(ParseFilePipe, new FileTypeValidationPipe())
     file: Express.Multer.File,
-  ) {
-    return this.avatarsService.uploadProfileImage(session.user.id, file.path);
-  }
+  ) {}
 }
