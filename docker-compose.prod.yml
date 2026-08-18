@@ -11,6 +11,11 @@ services:
     volumes:
       # 이름있는 볼륨. 컨테이너를 지워도 데이터는 남는다.
       - postgres-data:/var/lib/postgresql/data
+    ports:
+      # DB 클라이언트(DBeaver 등)로 들여다보기 위한 통로.
+      # 127.0.0.1 에 묶어 이 머신에서만 접근된다. 홈 네트워크에는 열리지 않는다.
+      # 5433 은 개발 DB, 5434 는 다른 스택이 쓰고 있어 5435 를 기본값으로 둔다.
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5435}:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
       interval: 10s
