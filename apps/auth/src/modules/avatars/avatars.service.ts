@@ -21,18 +21,20 @@ export class AvatarsService {
       .from(user)
       .where(eq(user.id, userId));
 
-    await mkdir(AVATAR_DIR, { recursive: true });
-
     // 원본 이름을 쓰지 않는다. 경로 조작을 막고 파일명 충돌 방지.
     // 확장자는 FileTypeValidationPipe 가 매직 넘버로 교정해둔 값이라 신뢰 가능
     const filename = `${randomUUID()}${extname(file.originalname)}`;
-    await writeFile(join(AVATAR_DIR, filename), file.buffer);
 
-    const image = `${AUTH_SERVER_URL}${AVATAR_PUBLIC_PATH}/${filename}`;
+    const key = `${userId}/${filename}`;
+
+    await mkdir(join(AVATAR_DIR, userId), { recursive: true });
+    await writeFile(join(AVATAR_DIR, key), file.buffer);
+
+    const image = `${AUTH_SERVER_URL}${AVATAR_PUBLIC_PATH}/${key}`;
 
     await this.db
       .update(user)
-      .set({ image, imageKey: filename, imageSource: 'upload' })
+      .set({ image, imageKey: key, imageSource: 'upload' })
       .where(eq(user.id, userId));
 
     // 예전에 직접 올린 파일만 지운다.

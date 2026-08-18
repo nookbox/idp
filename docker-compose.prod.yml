@@ -187,7 +187,8 @@ services:
   #
   #   호스트명            경로                                    → 서비스
   #   ─────────────────────────────────────────────────────────────────────────
-  #   id.nook-box.com    api/auth/*                              → auth:3001
+  #   id.nook-box.com    api/*                                   → auth:3001
+  #   id.nook-box.com    uploads/*                               → auth:3001
   #   id.nook-box.com    .well-known/oauth-authorization-server/* → auth:3001
   #   id.nook-box.com    (비움 = catch-all)                        → auth-web:3000
   #   nook-box.com       api/auth/*                              → nookbox-server:4000
@@ -201,13 +202,18 @@ services:
   #    web 의 서버 컴포넌트가 컨테이너 안에서만 부르기 때문이다(server-only).
   #    브라우저가 직접 부르는 건 /api/auth/* 뿐이다.
   #
-  # ⚠️ 두 번째 규칙을 빼먹지 말 것. main.ts 가 RFC 8414 규칙 때문에
+  # ⚠️ .well-known 규칙을 빼먹지 말 것. main.ts 가 RFC 8414 규칙 때문에
   #    oauth-authorization-server 메타데이터를 /api/auth 밑이 아니라
   #    /.well-known/oauth-authorization-server/api/auth 에 붙인다.
   #    이 규칙이 없으면 그 경로가 Next 로 새서 404 가 되고,
   #    RP 의 OIDC discovery 가 조용히 실패한다.
   #
-  # ⚠️ 대시보드 경로 입력란은 앞 슬래시를 넣지 않는다(`api/auth/*`).
+  # ⚠️ uploads/* 규칙을 빼먹지 말 것. 업로드는 /api/avatars/upload 로 들어가지만
+  #    저장된 파일을 브라우저가 다시 받아가는 경로는 /uploads/avatars/* 라
+  #    (main.ts 의 useStaticAssets, globalPrefix 밖) api/* 규칙에 걸리지 않는다.
+  #    이 규칙이 없으면 업로드는 성공하는데 아바타만 404 로 깨진다.
+  #
+  # ⚠️ 대시보드 경로 입력란은 앞 슬래시를 넣지 않는다(`api/*`).
   #
   # ⚠️ 예전의 auth.nook-box.com 규칙은 지운다. 남겨두면 그 호스트로 로그인했을 때
   #    쿠키가 다시 그쪽에 host-only 로 묶여 같은 증상이 재발한다.
