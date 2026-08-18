@@ -7,6 +7,9 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm -r test:e2e",
+    "test:unit": "pnpm -r test:unit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:studio": "pnpm --filter @nook/auth db:studio"

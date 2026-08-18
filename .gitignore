@@ -37,4 +37,4 @@ coverage/
 next-env.d.ts
 
 # 로컬 개발용 업로드 파일 (아바타 등)
-.data/
+uploads/

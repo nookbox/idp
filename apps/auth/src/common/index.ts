@@ -2,4 +2,5 @@
 export { RequestIdMiddleware } from './middlewares/request-id/request-id.middleware';
 export { AllExceptionsFilter } from './filters/all-exceptions.filter';
 export { LoggingInterceptor } from './interceptors/logging.interceptor';
+export { MulterExceptionInterceptor } from './interceptors/multer-exception.interceptor';
 export { AppLoggerModule } from './logger';
