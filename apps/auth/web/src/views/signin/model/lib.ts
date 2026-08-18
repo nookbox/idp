@@ -1,15 +1,20 @@
-import { ERROR_MESSAGES, SAVED_EMAIL_KEY } from './constants';
+import { AuthErrorLike, getAuthErrorMessage } from '@/shared/lib/auth-error';
+import {
+  SAVED_EMAIL_KEY,
+  SIGNIN_ERROR_MESSAGES,
+  SIGNIN_FALLBACK_ERROR,
+} from './constants';
 
 export function getSavedEmail(): string {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem(SAVED_EMAIL_KEY) ?? '';
 }
 
-export function getErrorMessage(message?: string): string {
-  if (!message) return '로그인에 실패했습니다. 잠시 후 다시 시도해주세요.';
-  return (
-    ERROR_MESSAGES[message] ??
-    '로그인에 실패했습니다. 잠시 후 다시 시도해주세요.'
+export function getErrorMessage(error?: AuthErrorLike | null): string {
+  return getAuthErrorMessage(
+    error,
+    SIGNIN_FALLBACK_ERROR,
+    SIGNIN_ERROR_MESSAGES,
   );
 }
 

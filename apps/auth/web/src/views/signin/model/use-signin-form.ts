@@ -53,7 +53,7 @@ export function useSigninForm() {
     });
 
     if (error) {
-      toast.error(getErrorMessage(error.message));
+      toast.error(getErrorMessage(error));
       return;
     }
 

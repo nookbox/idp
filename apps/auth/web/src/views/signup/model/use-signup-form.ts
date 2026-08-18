@@ -1,8 +1,10 @@
 import { authClient } from '@/shared/api/auth-client';
+import { getAuthErrorMessage } from '@/shared/lib/auth-error';
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { SIGNUP_ERROR_MESSAGES, SIGNUP_FALLBACK_ERROR } from './constants';
 import { FormValues, schema } from './schema';
 
 export function useSignupForm() {
@@ -28,8 +30,13 @@ export function useSignupForm() {
     });
 
     if (error) {
-      console.error('가입에러:', error);
-      toast.error(error.message ?? '가입에 실패했습니다');
+      toast.error(
+        getAuthErrorMessage(
+          error,
+          SIGNUP_FALLBACK_ERROR,
+          SIGNUP_ERROR_MESSAGES,
+        ),
+      );
       return;
     }
 
