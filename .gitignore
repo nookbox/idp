@@ -37,4 +37,7 @@ coverage/
 next-env.d.ts
 
 # 로컬 개발용 업로드 파일 (아바타 등)
+# .data 는 apps/auth/.env 의 AVATAR_DIR 기본값,
+# uploads 는 AVATAR_DIR 이 없을 때의 코드 기본값이다.
 .data/
+uploads/

@@ -3,7 +3,11 @@
 import { UserAvatar } from '@/entities/user';
 import { useLogout } from '@/features/logout';
 import { AccountSwitcher } from '@/features/switch-account';
-import { UploadAvatar } from '@/features/upload-avatar';
+import {
+  AvatarEditorDialog,
+  AvatarUploadTrigger,
+  useUploadAvatar,
+} from '@/features/upload-avatar';
 import { authClient } from '@/shared/api/auth-client';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
@@ -29,6 +33,7 @@ export function UserMenu() {
   const [accountsOpen, setAccountsOpen] = useState(false);
 
   const { data: session } = authClient.useSession();
+  const upload = useUploadAvatar();
   const { loggingOut, logout } = useLogout('all');
 
   if (!session) return null;
@@ -64,8 +69,9 @@ export function UserMenu() {
         </DropdownMenuLabel>
 
         <div className="flex justify-center items-center flex-col gap-2 py-2">
-          <UploadAvatar
+          <AvatarUploadTrigger
             user={session.user}
+            upload={upload}
             className="size-20"
             fullbackClassname="text-3xl"
           />
@@ -126,6 +132,10 @@ export function UserMenu() {
           </CollapsibleContent>
         </Collapsible>
       </DropdownMenuContent>
+
+      {/* 드롭다운 바깥에 둔다. 안에 넣으면 파일 선택창이 포커스를 가져갈 때
+          드롭다운이 닫히면서 모달까지 언마운트된다. */}
+      <AvatarEditorDialog upload={upload} />
     </DropdownMenu>
   );
 }

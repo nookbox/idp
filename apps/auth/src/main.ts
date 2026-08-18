@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+import { resolve } from 'path';
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -8,15 +10,19 @@ import {
   oauthProviderOpenIdConfigMetadata,
 } from '@better-auth/oauth-provider';
 import { toNodeHandler } from 'better-auth/node';
-import express, { type Express } from 'express';
+import type { Express } from 'express';
 import { RequestIdMiddleware } from './common';
+import {
+  AVATAR_DIR,
+  AVATAR_PUBLIC_PATH,
+} from './modules/avatars/constants/avatars.constants';
 
 import { AppModule } from './app.module';
 import { auth } from './lib/auth';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bodyParser: false,
+    bodyParser: false, // Required for Better Auth
   });
 
   const configuredCorsOrigins = (process.env.CORS_ORIGIN ?? '')
@@ -37,11 +43,19 @@ async function bootstrap(): Promise<void> {
   // 모든 Nest 컨트롤러를 /api 밑으로 모은다.
   app.setGlobalPrefix('api', { exclude: ['health'] });
 
+  // 업로드된 아바타를 그대로 서빙한다.
+  // globalPrefix 는 컨트롤러에만 적용되므로 여기는 /uploads 그대로 열린다.
+  //
+  // resolve 를 쓰는 이유는 AVATAR_DIR 이 개발에서는 상대 경로,
+  // 운영에서는 볼륨 절대 경로(/data/avatars)로 들어오기 때문이다.
+  app.useStaticAssets(resolve(AVATAR_DIR), { prefix: AVATAR_PUBLIC_PATH });
+
   // OIDC / OAuth 2.0 디스커버리 메타데이터.
   // issuer path가 /api/auth이므로 RFC 8414/OIDC Discovery 규칙에 맞춰
   //  - openid-configuration: issuer path 뒤에 .well-known을 붙임
   //  - oauth-authorization-server: .well-known 뒤에 issuer path를 붙임
-  // catch-all(`app.use('/api/auth', ...)`)보다 먼저 등록해야 매칭된다.
+  // AuthModule 이 /api/auth catch-all 을 붙이는 시점은 app.listen() 안의
+  // init() 이라, 여기서 먼저 등록해두면 express 스택에서 앞선다.
   const expressApp = app.getHttpAdapter().getInstance() as Express;
   expressApp.get(
     '/api/auth/.well-known/openid-configuration',
@@ -51,13 +65,6 @@ async function bootstrap(): Promise<void> {
     '/.well-known/oauth-authorization-server/api/auth',
     toNodeHandler(oauthProviderAuthServerMetadata(auth)),
   );
-
-  // better-auth는 가공되지 않은 원본 요청 스트림을 받아야 하므로
-  // body parser 미들웨어보다 먼저 마운트한다.
-  app.use('/api/auth', toNodeHandler(auth));
-
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
 
   app.useGlobalPipes(
     new ValidationPipe({

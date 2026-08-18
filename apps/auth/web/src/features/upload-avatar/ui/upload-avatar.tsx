@@ -1,6 +1,9 @@
-import { UserAvatar, type User } from '@/entities/user';
-import { cn } from '@/shared/lib/utils';
-import { Camera } from 'lucide-react';
+'use client';
+
+import { type User } from '@/entities/user';
+import { useUploadAvatar } from '../model/use-upload-avatar';
+import { AvatarEditorDialog } from './avatar-editor-dialog';
+import { AvatarUploadTrigger } from './avatar-upload-trigger';
 
 interface Props {
   user: Pick<User, 'name' | 'image'>;
@@ -9,22 +12,17 @@ interface Props {
 }
 
 export function UploadAvatar({ user, className, fullbackClassname }: Props) {
+  const upload = useUploadAvatar();
+
   return (
-    <div className="group relative inline-block cursor-pointer">
-      <UserAvatar
+    <>
+      <AvatarUploadTrigger
         user={user}
+        upload={upload}
         className={className}
         fullbackClassname={fullbackClassname}
       />
-
-      <div
-        className={cn(
-          'absolute right-0 bottom-0 rounded-full p-1.5',
-          'transition-all group-hover:text-blue-100',
-        )}
-      >
-        <Camera className="size-4" />
-      </div>
-    </div>
+      <AvatarEditorDialog upload={upload} />
+    </>
   );
 }
