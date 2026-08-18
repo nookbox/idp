@@ -13,7 +13,7 @@ export default async function Home({
       headers: { cookie: (await headers()).get('cookie') ?? '' },
     },
   });
-
+  console.log('session:', session);
   if (!session) redirect('/signin');
 
   const { verified, error } = await searchParams;
