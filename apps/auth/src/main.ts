@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import { join } from 'path';
+import { resolve } from 'path';
 
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -13,8 +13,8 @@ import { toNodeHandler } from 'better-auth/node';
 import type { Express } from 'express';
 import { RequestIdMiddleware } from './common';
 import {
-  UPLOAD_PUBLIC_PREFIX,
-  UPLOAD_ROOT,
+  AVATAR_DIR,
+  AVATAR_PUBLIC_PATH,
 } from './modules/avatars/constants/avatars.constants';
 
 import { AppModule } from './app.module';
@@ -45,9 +45,10 @@ async function bootstrap(): Promise<void> {
 
   // 업로드된 아바타를 그대로 서빙한다.
   // globalPrefix 는 컨트롤러에만 적용되므로 여기는 /uploads 그대로 열린다.
-  app.useStaticAssets(join(process.cwd(), UPLOAD_ROOT), {
-    prefix: UPLOAD_PUBLIC_PREFIX,
-  });
+  //
+  // resolve 를 쓰는 이유는 AVATAR_DIR 이 개발에서는 상대 경로,
+  // 운영에서는 볼륨 절대 경로(/data/avatars)로 들어오기 때문이다.
+  app.useStaticAssets(resolve(AVATAR_DIR), { prefix: AVATAR_PUBLIC_PATH });
 
   // OIDC / OAuth 2.0 디스커버리 메타데이터.
   // issuer path가 /api/auth이므로 RFC 8414/OIDC Discovery 규칙에 맞춰
