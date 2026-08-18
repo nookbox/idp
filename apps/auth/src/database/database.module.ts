@@ -1,8 +1,9 @@
 import { Global, Module, OnApplicationShutdown } from '@nestjs/common';
-import { db, sql, type Database } from './client';
+import { db, sql } from './client';
+import { DATABASE } from './database.types';
 
-export const DATABASE = Symbol('DATABASE');
-export type { Database };
+export { DATABASE };
+export type { Database } from './database.types';
 
 @Global()
 @Module({

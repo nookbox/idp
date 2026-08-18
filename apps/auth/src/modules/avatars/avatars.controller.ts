@@ -1,5 +1,6 @@
 import { Controller, ParseFilePipe, Post, UploadedFile } from '@nestjs/common';
 import { Session, UserSession } from '@thallesp/nestjs-better-auth';
+import { AVATAR_MAX_SIZE } from './constants/avatars.constants';
 import { AvatarsService } from './avatars.service';
 import { ApiImageFile } from './decorators/api-image.decorator';
 import { FileTypeValidationPipe } from './pipes/file-type-validation.pipe';
@@ -10,7 +11,7 @@ export class AvatarsController {
 
   @Post('upload')
   @ApiImageFile('avatar', true, {
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: AVATAR_MAX_SIZE },
   })
   changeProfile(
     @Session() session: UserSession,

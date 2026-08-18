@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+import { join } from 'path';
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -10,6 +12,10 @@ import {
 import { toNodeHandler } from 'better-auth/node';
 import type { Express } from 'express';
 import { RequestIdMiddleware } from './common';
+import {
+  UPLOAD_PUBLIC_PREFIX,
+  UPLOAD_ROOT,
+} from './modules/avatars/constants/avatars.constants';
 
 import { AppModule } from './app.module';
 import { auth } from './lib/auth';
@@ -36,6 +42,12 @@ async function bootstrap(): Promise<void> {
 
   // 모든 Nest 컨트롤러를 /api 밑으로 모은다.
   app.setGlobalPrefix('api', { exclude: ['health'] });
+
+  // 업로드된 아바타를 그대로 서빙한다.
+  // globalPrefix 는 컨트롤러에만 적용되므로 여기는 /uploads 그대로 열린다.
+  app.useStaticAssets(join(process.cwd(), UPLOAD_ROOT), {
+    prefix: UPLOAD_PUBLIC_PREFIX,
+  });
 
   // OIDC / OAuth 2.0 디스커버리 메타데이터.
   // issuer path가 /api/auth이므로 RFC 8414/OIDC Discovery 규칙에 맞춰
