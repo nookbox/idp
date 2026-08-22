@@ -3,6 +3,7 @@ import { createAuthMiddleware, APIError } from 'better-auth/api';
 import { jwt, admin, emailOTP, multiSession } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { oauthProvider } from '@better-auth/oauth-provider';
+import { CF_CONNECTING_IP_HEADER } from '../common/constants';
 import { db } from '../database/client';
 import {
   findBackchannelTargets,
@@ -96,6 +97,31 @@ export const auth = betterAuth({
     // 쿠키는 포트를 구분하지 않는다. 로컬에서 IdP 와 RP 가 둘 다 localhost 라
     // 기본 이름을 쓰면 서로 덮어쓴다. RP 쪽과 반드시 다른 값이어야 한다.
     cookiePrefix: 'nook-idp',
+    ipAddress: {
+      // 클라우드플레어 헤더값으로 통일
+      ipAddressHeaders: [CF_CONNECTING_IP_HEADER],
+    },
+  },
+  rateLimit: {
+    // 기본값은 production 에서만 켜진다. 개발에서도 동작을 확인할 수 있게
+    // 명시적으로 켠다(끄고 싶으면 DISABLE_RATE_LIMIT=1).
+    enabled: process.env.DISABLE_RATE_LIMIT !== '1',
+    // 기본 10초/100회. 창을 늘려 순간 폭주가 아니라 지속 폭주를 잡는다.
+    window: 60,
+    max: 120,
+    // 저장소는 메모리가 기본이라 컨테이너를 재시작하면 카운터가 날아간다.
+    // 'database' 로 두면 rateLimit 테이블에 쌓여 재시작을 넘어 유지된다.
+    storage: 'memory',
+    customRules: {
+      '/sign-up/email': { window: 300, max: 5 },
+      '/send-verification-email': { window: 300, max: 3 },
+      '/forget-password': { window: 300, max: 3 },
+      '/request-password-reset': { window: 300, max: 3 },
+      '/email-otp/send-verification-otp': { window: 300, max: 3 },
+      '/email-otp/request-password-reset': { window: 300, max: 3 },
+
+      '/sign-in/email': { window: 60, max: 10 },
+    },
   },
   user: {
     additionalFields: {

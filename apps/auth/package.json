@@ -46,6 +46,7 @@
     "@nestjs/core": "^11.0.10",
     "@nestjs/platform-express": "^11.0.10",
     "@nestjs/swagger": "^11.4.7",
+    "@nestjs/throttler": "^6.5.0",
     "@nook/email": "workspace:*",
     "@thallesp/nestjs-better-auth": "^2.7.0",
     "better-auth": "^1.6.11",

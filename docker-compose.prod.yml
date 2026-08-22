@@ -1,9 +1,27 @@
 name: nook-idp-prod
 
+# ---------------------------------------------------------
+# 공통 로그 설정.
+#
+# 도커의 기본 json-file 드라이버는 로그를 무한히 쌓는다. 누가 요청을 퍼부으면
+# 그 로그만으로 디스크가 찬다. 디스크가 차면 postgres 가 먼저 죽는다.
+# 컨테이너당 최대 30MB(10MB × 3)로 묶는다.
+# ---------------------------------------------------------
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *default-logging
+    # 상한이 없으면 한 컨테이너가 폭주할 때 맥미니 전체가 스왑으로 들어간다.
+    # 그러면 이 스택뿐 아니라 같은 머신의 다른 스택까지 같이 느려진다.
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+    cpus: ${POSTGRES_CPUS:-1.5}
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -90,6 +108,14 @@ services:
       context: .
       dockerfile: apps/auth/Dockerfile
     restart: unless-stopped
+    logging: *default-logging
+    # ⚠️ 아바타 업로드는 multer memoryStorage 라 요청 하나당 5MB 가 RAM 에
+    #    올라간다. 상한이 없으면 동시 업로드 폭주로 맥미니의 물리 메모리를
+    #    전부 먹고 OS 가 다른 프로세스를 죽이기 시작한다.
+    #    상한을 두면 그 컨테이너만 OOM 으로 죽고 restart 로 되살아난다.
+    #    (컨트롤러의 @Throttle 이 1차 방어, 이건 그게 뚫렸을 때의 안전망)
+    mem_limit: ${AUTH_MEM_LIMIT:-768m}
+    cpus: ${AUTH_CPUS:-2}
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -163,6 +189,9 @@ services:
         # 계정 페이지에서 NOOKBOX 랜딩으로 나가는 링크의 목적지.
         NEXT_PUBLIC_SERVICE_URL: ${SERVICE_ORIGIN}
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: ${WEB_MEM_LIMIT:-512m}
+    cpus: ${WEB_CPUS:-1.5}
     environment:
       AUTH_INTERNAL_URL: http://auth:3001
     ports:
@@ -228,6 +257,9 @@ services:
     restart: unless-stopped
     # --no-autoupdate: 컨테이너는 이미지 태그를 올려서 갱신하는 게 맞다.
     command: tunnel --no-autoupdate run
+    logging: *default-logging
+    mem_limit: ${CLOUDFLARED_MEM_LIMIT:-256m}
+    cpus: ${CLOUDFLARED_CPUS:-1}
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:

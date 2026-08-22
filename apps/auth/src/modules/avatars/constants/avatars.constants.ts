@@ -17,3 +17,8 @@ export const AVATAR_PUBLIC_PATH = '/uploads/avatars';
 
 /** 업로드 허용 최대 크기. 프론트의 MAX_FILE_SIZE 와 맞춰야 한다. */
 export const AVATAR_MAX_SIZE = 5 * 1024 * 1024;
+
+/**
+ * 아바타 업로드 IP 제한: 10분에 5회.
+ */
+export const AVATAR_UPLOAD_RATE_LIMIT = { ttl: 600_000, limit: 5 };

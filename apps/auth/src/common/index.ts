@@ -4,3 +4,5 @@ export { AllExceptionsFilter } from './filters/all-exceptions.filter';
 export { LoggingInterceptor } from './interceptors/logging.interceptor';
 export { MulterExceptionInterceptor } from './interceptors/multer-exception.interceptor';
 export { AppLoggerModule } from './logger';
+export { AppThrottlerModule } from './throttler/throttler.module';
+export { getClientIp } from './utils/client-ip';
