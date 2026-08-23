@@ -12,8 +12,10 @@ import {
 } from './backchannel-logout';
 import {
   OTP_EXPIRES_IN_SECONDS,
+  RESET_PASSWORD_LINK_EXPIRES_IN_SECONDS,
   VERIFY_LINK_EXPIRES_IN_SECONDS,
   sendOtpEmail,
+  sendResetPasswordLinkEmail,
   sendVerificationLinkEmail,
 } from './mailer';
 
@@ -65,8 +67,13 @@ const passwordPolicyPlugin = {
         }),
       },
       {
+        // 비밀번호가 새로 정해지는 모든 경로. 하나라도 빠지면 그 경로로 들어온
+        // 비밀번호는 숫자·특수문자 검사를 건너뛴다.
+        // (/reset-password 는 body 가 newPassword 라 아래 fallback 이 받는다)
         matcher: (ctx: { path?: string }) =>
-          ctx.path === '/sign-up/email' || ctx.path === '/change-password',
+          ctx.path === '/sign-up/email' ||
+          ctx.path === '/change-password' ||
+          ctx.path === '/reset-password',
         handler: createAuthMiddleware(async (ctx) => {
           const body = ctx.body as Record<string, unknown> | undefined;
           const password = body?.password ?? body?.newPassword;
@@ -117,8 +124,10 @@ export const auth = betterAuth({
       '/send-verification-email': { window: 300, max: 3 },
       '/forget-password': { window: 300, max: 3 },
       '/request-password-reset': { window: 300, max: 3 },
+      // 토큰 대입 방어. 재설정 토큰은 1회용이라 성공하면 소진되지만,
+      // 틀린 토큰은 얼마든지 다시 던질 수 있어 여기서 막는다.
+      '/reset-password': { window: 300, max: 10 },
       '/email-otp/send-verification-otp': { window: 300, max: 3 },
-      '/email-otp/request-password-reset': { window: 300, max: 3 },
 
       '/sign-in/email': { window: 60, max: 10 },
     },
@@ -170,7 +179,27 @@ export const auth = betterAuth({
       },
     },
   },
-  emailAndPassword: { enabled: true, minPasswordLength: 8 },
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 8,
+    resetPasswordTokenExpiresIn: RESET_PASSWORD_LINK_EXPIRES_IN_SECONDS,
+    /**
+     * 재설정에 성공하면 그 계정의 모든 세션을 끊는다. 비밀번호를 잊었다는 건
+     * 계정을 뺏겼을 수도 있다는 뜻이라, 남의 기기에 살아 있는 세션을 남기면 안 된다.
+     * 세션 삭제는 databaseHooks 를 거치므로 RP 백채널 로그아웃도 같이 나간다.
+     */
+    revokeSessionsOnPasswordReset: true,
+    /**
+     * `url` 은 better-auth 가 만들어 준다:
+     */
+    async sendResetPassword({ user, url }) {
+      await sendResetPasswordLinkEmail({
+        email: user.email,
+        url,
+        userName: user.name,
+      });
+    },
+  },
   emailVerification: {
     expiresIn: VERIFY_LINK_EXPIRES_IN_SECONDS,
     autoSignInAfterVerification: true,
@@ -182,7 +211,15 @@ export const auth = betterAuth({
       });
     },
   },
-  disabledPaths: ['/token'],
+  disabledPaths: [
+    '/token',
+    // 비밀번호 재설정은 메일 링크 방식 하나로만 간다. emailOTP 플러그인이
+    // 자동으로 여는 코드 방식 재설정 경로는 닫아 둔다. 열어두면 정책·레이트리밋을
+    // 두 벌 관리해야 하고, 둘 중 약한 쪽이 그 계정의 실질 보안 수준이 된다.
+    '/forget-password/email-otp',
+    '/email-otp/request-password-reset',
+    '/email-otp/reset-password',
+  ],
   plugins: [
     emailOTP({
       otpLength: 6,
@@ -195,9 +232,12 @@ export const auth = betterAuth({
         switch (type) {
           case 'email-verification': // emailOtp API 를 직접 부를 때만 (기본 인증은 링크)
           case 'sign-in': // 비밀번호 없이 코드로 로그인
-          case 'forget-password': // 비밀번호 재설정
           case 'change-email': // 계정 이메일 주소 변경
             await sendOtpEmail({ email, otp, purpose: type });
+            break;
+          // 'forget-password' 는 나가지 않는다. 재설정은 메일 링크 방식이라
+          // 해당 경로를 disabledPaths 로 닫아 두었다.
+          case 'forget-password':
             break;
         }
       },

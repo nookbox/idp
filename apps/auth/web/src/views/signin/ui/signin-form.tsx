@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthLink } from '@/shared/ui/auth-link';
 import { SubmitButton } from '@/shared/ui/submit-button';
 import { FloatingLabelInput } from '@/shared/ui/floating-label-input';
 import { Checkbox } from '@/shared/ui/checkbox';
@@ -37,18 +38,27 @@ export function SigninForm() {
           <p className="text-xs text-destructive">{errors.password.message}</p>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="save-email"
-          checked={saveEmail}
-          onCheckedChange={(checked) => setSaveEmail(checked === true)}
-        />
-        <Label
-          htmlFor="save-email"
-          className="text-sm font-normal cursor-pointer"
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="save-email"
+            checked={saveEmail}
+            onCheckedChange={(checked) => setSaveEmail(checked === true)}
+          />
+          <Label
+            htmlFor="save-email"
+            className="text-sm font-normal cursor-pointer"
+          >
+            이메일 저장
+          </Label>
+        </div>
+
+        <AuthLink
+          href="/forgot-password"
+          className="text-sm text-muted-foreground underline hover:text-foreground"
         >
-          이메일 저장
-        </Label>
+          비밀번호를 잊으셨나요?
+        </AuthLink>
       </div>
       <SubmitButton loading={isSubmitting} loadingText="로그인 중">
         로그인

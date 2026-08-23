@@ -11,9 +11,26 @@ import {
   VerifyEmailLink,
   type VerifyEmailLinkProps,
 } from './templates/verify-email-link';
+import {
+  RESET_PASSWORD_LINK_SUBJECT,
+  ResetPasswordLink,
+  type ResetPasswordLinkProps,
+} from './templates/reset-password-link';
 
-export { OTP_COPY, VerifyOtp, VERIFY_EMAIL_LINK_SUBJECT, VerifyEmailLink };
-export type { OtpPurpose, VerifyOtpProps, VerifyEmailLinkProps };
+export {
+  OTP_COPY,
+  VerifyOtp,
+  VERIFY_EMAIL_LINK_SUBJECT,
+  VerifyEmailLink,
+  RESET_PASSWORD_LINK_SUBJECT,
+  ResetPasswordLink,
+};
+export type {
+  OtpPurpose,
+  VerifyOtpProps,
+  VerifyEmailLinkProps,
+  ResetPasswordLinkProps,
+};
 
 /** 발송 라이브러리(Resend 등)에 그대로 넘길 수 있는 형태. */
 export interface RenderedEmail {
@@ -51,6 +68,21 @@ export async function renderVerifyEmailLink(
 
   return {
     subject: VERIFY_EMAIL_LINK_SUBJECT,
+    html,
+    text,
+  };
+}
+
+export async function renderResetPasswordLink(
+  props: ResetPasswordLinkProps,
+): Promise<RenderedEmail> {
+  const element = ResetPasswordLink(props);
+
+  const html = await render(element);
+  const text = toPlainText(html);
+
+  return {
+    subject: RESET_PASSWORD_LINK_SUBJECT,
     html,
     text,
   };

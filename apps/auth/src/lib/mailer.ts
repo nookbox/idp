@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import { Logger } from '@nestjs/common';
 import {
+  renderResetPasswordLink,
   renderVerifyEmailLink,
   renderVerifyOtp,
   type OtpPurpose,
+  type RenderedEmail,
 } from '@nook/email';
 import { Resend } from 'resend';
 
@@ -23,6 +25,15 @@ export const VERIFY_LINK_EXPIRES_IN_SECONDS = 60 * 60;
 export const VERIFY_LINK_EXPIRES_IN_MINUTES =
   VERIFY_LINK_EXPIRES_IN_SECONDS / 60;
 
+/**
+ * 비밀번호 재설정 링크 유효 시간.
+ * 이메일 인증 링크(1시간)보다 짧게 잡는다. 이 링크를 쥔 사람은 비밀번호를
+ * 바꿀 수 있으므로, 메일함이 잠깐 열려 있던 사이에 새는 창을 줄인다.
+ */
+export const RESET_PASSWORD_LINK_EXPIRES_IN_SECONDS = 30 * 60;
+export const RESET_PASSWORD_LINK_EXPIRES_IN_MINUTES =
+  RESET_PASSWORD_LINK_EXPIRES_IN_SECONDS / 60;
+
 const apiKey = process.env.RESEND_API_KEY;
 
 /**
@@ -34,12 +45,12 @@ const from = process.env.EMAIL_FROM ?? 'NookBox <onboarding@resend.dev>';
 
 if (isProduction && !apiKey) {
   throw new Error(
-    'RESEND_API_KEY 가 없습니다. OTP 메일을 보낼 수 없으므로 기동을 중단합니다.',
+    'RESEND_API_KEY 가 없습니다. 메일을 보낼 수 없으므로 기동을 중단합니다.',
   );
 }
 if (!apiKey) {
   logger.warn(
-    'RESEND_API_KEY 가 없습니다. 메일은 발송되지 않고 OTP 가 이 콘솔에 출력됩니다.',
+    'RESEND_API_KEY 가 없습니다. 메일은 발송되지 않고 코드·링크가 이 콘솔에 출력됩니다.',
   );
 } else if (!process.env.EMAIL_FROM) {
   logger.warn(
@@ -49,10 +60,78 @@ if (!apiKey) {
 
 const resend = apiKey ? new Resend(apiKey) : null;
 
+interface DeliverParams {
+  to: string;
+  /** 로그 문구에 쓰이는 메일 종류. "OTP", "인증 링크" 처럼 사람이 읽을 이름. */
+  kind: string;
+  /** 렌더는 발송이 확정된 뒤에만 돈다. dev 폴백에서는 아예 호출되지 않는다. */
+  render: () => Promise<RenderedEmail>;
+  /**
+   * 모든 로그에 붙는 식별 정보.
+   * ⚠️코드·토큰 같은 비밀값을 넣으면 안 된다. 운영 로그에 그대로 남는다.
+   */
+  context?: string;
+  /** dev 폴백 로그에만 붙는다. 메일이 안 나가므로 코드·링크를 여기 담아 확인한다. */
+  devContext?: string;
+}
+
+function tag(...parts: (string | undefined)[]): string {
+  const joined = parts.filter(Boolean).join(' ');
+  return joined ? ` ${joined}` : '';
+}
+
+async function deliver({
+  to,
+  kind,
+  render,
+  context,
+  devContext,
+}: DeliverParams): Promise<void> {
+  try {
+    if (!resend) {
+      logger.warn(
+        `[DEV] RESEND_API_KEY 없음 — 메일 대신 콘솔 출력. to=${to}${tag(context, devContext)}`,
+      );
+      return;
+    }
+
+    const { subject, html, text } = await render();
+
+    const { data, error } = await resend.emails.send({
+      from,
+      to,
+      subject,
+      html,
+      text,
+      headers: {
+        // Gmail 은 제목이 비슷한 메일을 한 스레드로 묶는다. 그러면 사용자가 접힌
+        // 예전 메일을 열어 만료된 코드·링크를 쓰고 "안 된다"가 반복된다.
+        // 매번 다른 참조 ID 를 주면 각 메일이 별도 스레드로 분리된다.
+        'X-Entity-Ref-ID': randomUUID(),
+      },
+    });
+
+    if (error) {
+      logger.error(
+        `${kind} 메일 발송 실패 (Resend 응답).${tag(context)} name=${error.name} message=${error.message}`,
+      );
+      return;
+    }
+
+    logger.log(`${kind} 메일 발송 완료.${tag(context)} id=${data?.id}`);
+  } catch (err) {
+    // 렌더 실패, 네트워크 오류 등.
+    logger.error(
+      `${kind} 메일 발송 실패 (예외).${tag(context)}`,
+      err instanceof Error ? err.stack : String(err),
+    );
+  }
+}
+
 /**
  * OTP 메일 발송.
  */
-export async function sendOtpEmail(params: {
+export function sendOtpEmail(params: {
   email: string;
   otp: string;
   purpose: OtpPurpose;
@@ -60,104 +139,63 @@ export async function sendOtpEmail(params: {
 }): Promise<void> {
   const { email, otp, purpose, userName } = params;
 
-  try {
-    if (!resend) {
-      logger.warn(
-        `[DEV] RESEND_API_KEY 없음 — 메일 대신 콘솔 출력. to=${email} purpose=${purpose} otp=${otp}`,
-      );
-      return;
-    }
-
-    const { subject, html, text } = await renderVerifyOtp({
-      purpose,
-      otp,
-      userName,
-      expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
-    });
-
-    const { data, error } = await resend.emails.send({
-      from,
-      to: email,
-      subject,
-      html,
-      text,
-      headers: {
-        // Gmail 은 제목이 비슷한 메일을 한 스레드로 묶는다. 그러면 사용자가
-        // 접힌 예전 코드를 보고 입력해서 "코드가 틀렸다"가 반복된다.
-        // 매번 다른 참조 ID 를 주면 각 메일이 별도 스레드로 분리된다.
-        'X-Entity-Ref-ID': randomUUID(),
-      },
-    });
-
-    // Resend SDK 는 API 오류를 throw 하지 않고 error 필드에 담아 돌려준다.
-    // 이 분기를 빼면 발송 실패가 성공으로 조용히 지나간다.
-    if (error) {
-      logger.error(
-        `OTP 메일 발송 실패 (Resend 응답). purpose=${purpose} name=${error.name} message=${error.message}`,
-      );
-      return;
-    }
-
-    logger.log(`OTP 메일 발송 완료. purpose=${purpose} id=${data?.id}`);
-  } catch (err) {
-    // 렌더 실패, 네트워크 오류 등. 여기서 막지 않으면 unhandled rejection 이 된다.
-    logger.error(
-      `OTP 메일 발송 실패 (예외). purpose=${purpose}`,
-      err instanceof Error ? err.stack : String(err),
-    );
-  }
+  return deliver({
+    to: email,
+    kind: 'OTP',
+    context: `purpose=${purpose}`,
+    devContext: `otp=${otp}`,
+    render: () =>
+      renderVerifyOtp({
+        purpose,
+        otp,
+        userName,
+        expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
+      }),
+  });
 }
 
 /**
  * 이메일 인증 링크 메일 발송.
  */
-export async function sendVerificationLinkEmail(params: {
+export function sendVerificationLinkEmail(params: {
   email: string;
   url: string;
   userName?: string;
 }): Promise<void> {
   const { email, url, userName } = params;
 
-  try {
-    if (!resend) {
-      logger.warn(
-        `[DEV] RESEND_API_KEY 없음 — 메일 대신 콘솔 출력. to=${email} url=${url}`,
-      );
-      return;
-    }
+  return deliver({
+    to: email,
+    kind: '인증 링크',
+    devContext: `url=${url}`,
+    render: () =>
+      renderVerifyEmailLink({
+        url,
+        userName,
+        expiresInMinutes: VERIFY_LINK_EXPIRES_IN_MINUTES,
+      }),
+  });
+}
 
-    const { subject, html, text } = await renderVerifyEmailLink({
-      url,
-      userName,
-      expiresInMinutes: VERIFY_LINK_EXPIRES_IN_MINUTES,
-    });
+/**
+ * 비밀번호 재설정 링크 메일 발송.
+ */
+export function sendResetPasswordLinkEmail(params: {
+  email: string;
+  url: string;
+  userName?: string;
+}): Promise<void> {
+  const { email, url, userName } = params;
 
-    const { data, error } = await resend.emails.send({
-      from,
-      to: email,
-      subject,
-      html,
-      text,
-      headers: {
-        // 제목이 매번 같아서 Gmail 이 재발송분을 예전 메일과 한 스레드로 접는다.
-        // 그러면 사용자가 만료된 링크를 눌러 "인증이 안 된다"가 반복된다.
-        'X-Entity-Ref-ID': randomUUID(),
-      },
-    });
-
-    // Resend SDK 는 API 오류를 throw 하지 않고 error 필드에 담아 돌려준다.
-    if (error) {
-      logger.error(
-        `인증 링크 메일 발송 실패 (Resend 응답). name=${error.name} message=${error.message}`,
-      );
-      return;
-    }
-
-    logger.log(`인증 링크 메일 발송 완료. id=${data?.id}`);
-  } catch (err) {
-    logger.error(
-      '인증 링크 메일 발송 실패 (예외).',
-      err instanceof Error ? err.stack : String(err),
-    );
-  }
+  return deliver({
+    to: email,
+    kind: '비밀번호 재설정',
+    devContext: `reset-url=${url}`,
+    render: () =>
+      renderResetPasswordLink({
+        url,
+        userName,
+        expiresInMinutes: RESET_PASSWORD_LINK_EXPIRES_IN_MINUTES,
+      }),
+  });
 }
