@@ -47,6 +47,9 @@ export const AUTH_ERROR_MESSAGES: Record<string, string> = {
   FAILED_TO_UNLINK_LAST_ACCOUNT: '마지막 로그인 수단은 연결 해제할 수 없습니다',
   PROVIDER_NOT_FOUND: '지원하지 않는 로그인 제공자입니다',
 
+  TOO_MANY_REQUESTS_PLEASE_TRY_AGAIN_LATER:
+    '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요',
+
   // 요청 검증
   VALIDATION_ERROR: '입력값을 다시 확인해주세요',
   MISSING_FIELD: '필수 입력값이 비어 있습니다',
