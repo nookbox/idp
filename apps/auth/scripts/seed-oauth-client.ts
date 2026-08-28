@@ -115,7 +115,7 @@ const CLIENTS: ClientSeed[] = [
     enable_end_session: true,
     post_logout_redirect_uris: readUrlListEnv(
       'NOOK_POST_LOGOUT_REDIRECT_URIS',
-      ['http://localhost:3030'],
+      ['http://localhost:3030', 'http://localhost:3030/'],
     ),
     backchannel_logout_uri:
       process.env.NOOK_BACKCHANNEL_LOGOUT_URI ??
