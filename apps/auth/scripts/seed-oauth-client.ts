@@ -108,7 +108,7 @@ const CLIENTS: ClientSeed[] = [
   {
     name: 'Nook Backend',
     redirect_uris: readUrlListEnv('NOOK_OAUTH_CALLBACK_URIS', [
-      'http://localhost:4000/api/auth/oauth2/callback/nook-auth',
+      'http://localhost:4000/api/auth/callback/nook-auth',
     ]),
     skip_consent: true, // first-party RP → consent 화면 스킵
     require_pkce: true,
@@ -185,19 +185,23 @@ function assertLogoutConfigConsistent(clients: ClientSeed[]): void {
   );
 }
 
-async function applyClientLogoutConfig(
+/**
+ * 이미 등록된 client 의 설정을 CLIENTS 항목에 맞춘다.
+ *
+ * redirect_uris 까지 여기서 맞추는 이유: RP 의 콜백 경로는 RP 쪽 라이브러리를
+ * 올리면 바뀔 수 있다(better-auth 1.7 이 genericOAuth 의 /oauth2/callback/:id 를
+ * 코어의 /callback/:id 로 옮긴 것처럼). 등록 시점 값만 남으면 IdP 는 멀쩡한데
+ * 로그인만 redirect_uri 불일치로 깨지고, 원인이 DB 안에 있어 잘 안 보인다.
+ *
+ * ⚠️ 이 스크립트가 client 설정의 단일 출처가 된다는 뜻이다. DB 에서 손으로 고친
+ *    값은 다음 시드 실행 때 CLIENTS 값으로 되돌아간다.
+ */
+async function applyClientConfig(
   clientId: string,
   cfg: ClientSeed,
 ): Promise<void> {
-  if (
-    cfg.enable_end_session === undefined &&
-    cfg.post_logout_redirect_uris === undefined &&
-    cfg.backchannel_logout_uri === undefined
-  ) {
-    return;
-  }
-
   const updates = {
+    redirectUris: cfg.redirect_uris,
     ...(cfg.enable_end_session !== undefined
       ? { enableEndSession: cfg.enable_end_session }
       : {}),
@@ -264,11 +268,11 @@ async function seedOne(cfg: ClientSeed, cookie: string): Promise<void> {
     .limit(1);
 
   if (existing) {
-    await applyClientLogoutConfig(existing.clientId, cfg);
+    await applyClientConfig(existing.clientId, cfg);
     console.log(`\n[skip] "${cfg.name}" 은 이미 등록되어 있습니다.`);
     console.log({
       client_id: existing.clientId,
-      redirect_uris: existing.redirectUris,
+      redirect_uris: cfg.redirect_uris,
       skip_consent: existing.skipConsent,
       enable_end_session: cfg.enable_end_session ?? existing.enableEndSession,
       post_logout_redirect_uris:
@@ -293,7 +297,7 @@ async function seedOne(cfg: ClientSeed, cookie: string): Promise<void> {
     headers: new Headers({ cookie }),
   });
 
-  await applyClientLogoutConfig(created.client_id, cfg);
+  await applyClientConfig(created.client_id, cfg);
 
   console.log(`\n[created] "${cfg.name}" ===`);
   console.log(`  client_id     = ${created.client_id}`);
