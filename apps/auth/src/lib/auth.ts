@@ -6,11 +6,6 @@ import { oauthProvider } from '@better-auth/oauth-provider';
 import { CF_CONNECTING_IP_HEADER } from '../common/constants';
 import { db } from '../database/client';
 import {
-  findBackchannelTargets,
-  notifyBackchannelLogout,
-  type BackchannelTarget,
-} from './backchannel-logout';
-import {
   OTP_EXPIRES_IN_SECONDS,
   RESET_PASSWORD_LINK_EXPIRES_IN_SECONDS,
   VERIFY_LINK_EXPIRES_IN_SECONDS,
@@ -31,13 +26,6 @@ const corsOrigins = (process.env.CORS_ORIGIN ?? '')
 const trustedOrigins = [
   ...new Set([authServerUrl, authWebUrl, ...corsOrigins]),
 ];
-
-/**
- * 세션 삭제 훅의 before -> after 사이에서만 산다. 세션 id 로 넣고 바로 뺀다.
- * DELETE 자체가 터지면 after 가 안 돌아 항목이 남지만, 행당 문자열 몇 개라
- * 무시할 만하고 그 상황이면 이미 DB 가 죽은 거다.
- */
-const pendingTargets = new Map<string, BackchannelTarget[]>();
 
 // 완성형 한글·영문만 (자음/모음 단독 불가), 단어 사이 단일 공백만 허용
 const NAME_PATTERN = /^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$/;
@@ -122,7 +110,6 @@ export const auth = betterAuth({
     customRules: {
       '/sign-up/email': { window: 300, max: 5 },
       '/send-verification-email': { window: 300, max: 3 },
-      '/forget-password': { window: 300, max: 3 },
       '/request-password-reset': { window: 300, max: 3 },
       // 토큰 대입 방어. 재설정 토큰은 1회용이라 성공하면 소진되지만,
       // 틀린 토큰은 얼마든지 다시 던질 수 있어 여기서 막는다.
@@ -141,44 +128,6 @@ export const auth = betterAuth({
       },
     },
   },
-  databaseHooks: {
-    session: {
-      // 세션 행이 지워질 때마다 RP 에 알린다(행 단위. 계정 3개면 3번).
-      // 엔드포인트가 아니라 DB 레이어에 거는 이유는, 세션을 지우는 API 가
-      // /sign-out 말고도 여럿이라(계정 제거, 기기 종료, 비번 변경, 탈퇴...)
-      // 하나씩 걸면 빠뜨리기 때문. 여기는 그것들이 다 거쳐가는 길목이다.
-      delete: {
-        // 통지 대상은 여기서 뽑아둬야 한다. oauth_access_token / oauth_refresh_token
-        // 의 session_id 가 onDelete: 'set null' 이라, 행이 지워진 뒤엔 이 세션이
-        // 어느 RP 에 물려 있었는지 알 방법이 없다.
-        before: async (session) => {
-          try {
-            pendingTargets.set(
-              session.id,
-              await findBackchannelTargets(session.id),
-            );
-          } catch (error) {
-            console.error('[backchannel-logout] 통지 대상 조회 실패:', error);
-          }
-        },
-        after: (session) => {
-          const targets = pendingTargets.get(session.id);
-          pendingTargets.delete(session.id);
-          if (!targets) return Promise.resolve();
-
-          // 기다리지 않는다. RP 가 죽어 있으면 타임아웃까지 붙잡히고,
-          // 여러 행이 한 번에 지워지면 그만큼 쌓인다. 실패는 안에서 삼킨다.
-          void notifyBackchannelLogout({
-            id: session.id,
-            userId: session.userId,
-            targets,
-          });
-
-          return Promise.resolve();
-        },
-      },
-    },
-  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
@@ -186,7 +135,7 @@ export const auth = betterAuth({
     /**
      * 재설정에 성공하면 그 계정의 모든 세션을 끊는다. 비밀번호를 잊었다는 건
      * 계정을 뺏겼을 수도 있다는 뜻이라, 남의 기기에 살아 있는 세션을 남기면 안 된다.
-     * 세션 삭제는 databaseHooks 를 거치므로 RP 백채널 로그아웃도 같이 나간다.
+     * 세션이 지워지면 oauthProvider 가 RP 백채널 로그아웃을 자동으로 내보낸다.
      */
     revokeSessionsOnPasswordReset: true,
     /**

@@ -73,6 +73,11 @@ interface ClientSeed {
    * 이 값을 넣으면 enable_end_session 도 true 여야 한다(id_token 의 sid 가 필요).
    * assertLogoutConfigConsistent 참고.
    *
+   * better-auth 1.7 부터 oauth_client.backchannel_logout_uri 컬럼을 플러그인이
+   * 직접 읽어 통지한다. 등록 API(adminCreateOAuthClient)로도 넘길 수 있지만
+   * 그 경로는 https + 공인 호스트만 통과시켜서, 아래 docker 내부 주소처럼
+   * 사설 호스트를 쓰려면 여기처럼 컬럼에 직접 써야 한다.
+   *
    * ⚠️ 이건 브라우저가 아니라 IdP 서버가 부르는 주소다. nookbox 처럼 같은
    *    docker 네트워크(nook-edge)에 있으면 컨테이너 이름으로 바로 부를 수 있어
    *    터널에 경로를 뚫지 않아도 된다:
@@ -82,7 +87,7 @@ interface ClientSeed {
   backchannel_logout_uri?: string;
   token_endpoint_auth_method?:
     'client_secret_post' | 'client_secret_basic' | 'none';
-  type?: 'web' | 'native' | 'user-agent-based';
+  application_type?: 'web' | 'native';
 }
 
 function readUrlListEnv(name: string, fallback: string[]): string[] {
@@ -164,7 +169,8 @@ const SEED_NAME = 'Seed Admin';
  */
 function assertLogoutConfigConsistent(clients: ClientSeed[]): void {
   const broken = clients.filter(
-    (cfg) => cfg.backchannel_logout_uri !== undefined && !cfg.enable_end_session,
+    (cfg) =>
+      cfg.backchannel_logout_uri !== undefined && !cfg.enable_end_session,
   );
 
   if (broken.length === 0) return;
@@ -191,21 +197,6 @@ async function applyClientLogoutConfig(
     return;
   }
 
-  // metadata 는 jsonb 라 통째로 덮으면 다른 키가 날아간다. 읽어서 병합한다.
-  let metadata: Record<string, unknown> | undefined;
-  if (cfg.backchannel_logout_uri !== undefined) {
-    const [existing] = await db
-      .select({ metadata: oauthClient.metadata })
-      .from(oauthClient)
-      .where(eq(oauthClient.clientId, clientId))
-      .limit(1);
-
-    metadata = {
-      ...((existing?.metadata as Record<string, unknown> | null) ?? {}),
-      backchannel_logout_uri: cfg.backchannel_logout_uri,
-    };
-  }
-
   const updates = {
     ...(cfg.enable_end_session !== undefined
       ? { enableEndSession: cfg.enable_end_session }
@@ -213,7 +204,9 @@ async function applyClientLogoutConfig(
     ...(cfg.post_logout_redirect_uris !== undefined
       ? { postLogoutRedirectUris: cfg.post_logout_redirect_uris }
       : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
+    ...(cfg.backchannel_logout_uri !== undefined
+      ? { backchannelLogoutUri: cfg.backchannel_logout_uri }
+      : {}),
     updatedAt: new Date(),
   };
 
@@ -293,7 +286,7 @@ async function seedOne(cfg: ClientSeed, cookie: string): Promise<void> {
       response_types: ['code'],
       token_endpoint_auth_method:
         cfg.token_endpoint_auth_method ?? 'client_secret_post',
-      type: cfg.type ?? 'web',
+      application_type: cfg.application_type ?? 'web',
       skip_consent: cfg.skip_consent ?? false,
       require_pkce: cfg.require_pkce ?? true,
     },
