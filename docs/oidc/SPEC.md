@@ -1,0 +1,223 @@
+# OIDC 직접 구현 학습 스펙
+
+> better-auth 의 OIDC 제공자 기능을 걷어내고 IdP/RP 를 **직접** 구현하며 OIDC 를 배운다.
+> 이 문서는 학습 진행 상태의 단일 기준(source of truth)이다. 새 세션은 이 문서부터 읽는다.
+
+## 1. 학습자 & 멘토링 규칙
+
+- 학습자: OIDC 완전 초보. JWT 개념은 앎.
+- 멘토(Claude) 역할: **길잡이**. 정답 코드를 먼저 주지 않는다.
+  1. 단계마다 개념 + "무엇을 만들어야 하는지"(요구사항/검증 항목)만 설명
+  2. 학습자가 직접 구현
+  3. 멘토가 리뷰 — 특히 보안 검증 누락을 짚는다
+  4. 막히면 힌트를 단계적으로(개념 → 방향 → 의사코드 → 코드). 코드는 최후 수단
+- 단계 시작 전 확인 질문으로 이해도 점검 → 설명 깊이 조절
+- 진행할 때마다 §7 진행 상태, §8 학습 로그, §9 오답 노트를 갱신한다
+- **복습 규칙**: 학습자가 "단계 N 복습하자"라고 하면 §9 에서 그 단계의 미해결(❌/△) 항목을 찾아
+  **같은 질문을 반복하지 말고 응용 질문**(상황 바꾸기, 공격 시나리오, "이게 없으면 무슨 일이?" 등)으로 다시 낸다.
+  맞히면 해당 항목에 복습 날짜와 ✅ 를 기록, 또 틀리면 날짜와 함께 ❌ 를 추가한다
+
+## 2. 범위
+
+### Phase 1 — OIDC 제공자 직접 구현 (현재 목표)
+- 회원가입/로그인/세션/이메일 인증 등 **회원 기능은 better-auth 유지**
+- IdP 는 "지금 로그인한 사용자가 누구인가"만 better-auth 세션에서 얻는다
+- 그 외 OIDC 엔드포인트·토큰 발급·검증은 전부 직접 구현
+- better-auth 의 `jwt()`, `oauthProvider()` 플러그인은 직접 구현이 대체한 뒤 제거
+
+### Phase 2 — 회원/세션까지 직접 구현 (Phase 1 완료 후)
+- 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현 → better-auth 완전 제거
+- 세부 스펙은 Phase 1 끝난 뒤 작성
+
+### 범위 밖 (YAGNI)
+- Implicit / Hybrid flow (보안상 비권장, 학습 가치 낮음)
+- Dynamic Client Registration
+- Front-channel / Back-channel logout (필요해지면 추가)
+- `private_key_jwt` client 인증 (`client_secret_basic` 만)
+
+## 3. 기술 결정
+
+| 항목 | 결정 | 이유 |
+|---|---|---|
+| JWT 서명/검증 | `jose` (이미 설치됨) | 암호 원시연산 직접 구현은 학습 목표 아님 + 사고 위험 |
+| 서명 알고리즘 | RS256 | OIDC 필수 지원 알고리즘 |
+| Flow | Authorization Code + PKCE(S256) | 현재 권장 표준 |
+| Client 인증 | `client_secret_basic` | 가장 단순한 표준 방식 |
+| IdP 서버 | `apps/auth` (NestJS) | 기존 구조 |
+| 로그인/동의 UI | `apps/auth/web` (Next.js) | 기존 구조 |
+| 테스트 RP | 새 앱 `apps/rp` (Next.js, 최소 구성) | OIDC 클라이언트 쪽도 직접 구현 |
+| DB | Postgres + Drizzle | 기존 구조 |
+| 브랜치 | `feature/oidc` 에서 학습용 브랜치 분기 | |
+
+## 4. 핵심 흐름 (Authorization Code + PKCE)
+
+```
+브라우저 → RP:   "로그인" 클릭
+RP:              state, nonce, code_verifier 생성 → 쿠키에 저장
+RP → 브라우저:   302 → IdP/authorize?response_type=code&client_id&redirect_uri
+                        &scope=openid profile email&state&nonce
+                        &code_challenge&code_challenge_method=S256
+브라우저 → IdP:  /authorize — 미로그인 → 로그인 화면 → 다시 /authorize
+                            — 미동의 → 동의 화면 → 다시 /authorize
+IdP → 브라우저:  302 → RP/callback?code&state
+RP:              state 일치 확인
+RP → IdP:        POST /token (code, redirect_uri, code_verifier, Basic 인증)   ← 서버 간 통신
+IdP → RP:        { id_token, access_token, refresh_token?, expires_in, token_type }
+RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 세션 생성
+```
+
+## 5. 단계별 요구사항 (Phase 1)
+
+각 단계의 **완료 조건** 체크리스트를 모두 만족해야 다음 단계로 간다.
+
+### 단계 0 — 흐름 이해 (코드 없음)
+확인 질문:
+1. 토큰을 브라우저에 바로 주지 않고 code 를 거치는 이유는?
+2. `state` 는 무엇을 막는가?
+3. ID Token 과 Access Token 의 용도 차이는? (누가 읽고, 누구에게 보내는가)
+4. RP 는 id_token 서명을 무엇으로 검증하며, 그 키는 어디서 얻는가?
+
+### 단계 1 — 최소 RP (`apps/rp`)
+- [ ] `/` 로그인 버튼, `/callback` 페이지, 로그인 후 사용자 정보 표시
+- [ ] `state` 생성 → 쿠키 저장 → callback 에서 일치 검증 (불일치 시 거부)
+- [ ] 이 단계에선 IdP 가 아직 없으므로 authorize URL 조립까지만 확인
+- 스펙: RFC 6749 §4.1, §10.12
+
+### 단계 2 — Discovery `GET /.well-known/openid-configuration`
+- [ ] `issuer`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, `jwks_uri`
+- [ ] `response_types_supported`, `subject_types_supported`, `id_token_signing_alg_values_supported`
+- [ ] `scopes_supported`, `code_challenge_methods_supported`, `token_endpoint_auth_methods_supported`
+- [ ] `issuer` 값은 이후 발급하는 모든 토큰의 `iss` 와 **정확히** 일치
+- [ ] RP 가 하드코딩 대신 이 문서에서 엔드포인트를 읽도록 변경
+- 스펙: OIDC Discovery 1.0 §3, §4
+
+### 단계 3 — 서명키 & `GET /jwks`
+- [ ] RS256 키쌍 생성·저장 (개인키는 절대 응답에 포함 금지, DB 저장 시 암호화 고려)
+- [ ] JWKS 응답: 공개키만, 각 키에 `kid`, `kty`, `alg`, `use: "sig"`
+- [ ] 키 교체(rotation) 시 이전 공개키를 잠시 함께 노출해야 하는 이유 설명 가능
+- 스펙: RFC 7517
+
+### 단계 4 — `GET /authorize`
+- [ ] `client_id` 존재 확인
+- [ ] `redirect_uri` 가 등록값과 **정확히 일치** (부분 일치·prefix 금지)
+- [ ] client_id/redirect_uri 가 틀리면 **redirect 하지 말고** 에러 화면 (open redirect 방지)
+- [ ] 그 외 에러는 `redirect_uri?error=...&state=...` 로 돌려줌
+- [ ] `response_type=code`, `scope` 에 `openid` 포함 확인
+- [ ] PKCE: `code_challenge` 필수, method `S256` 만 허용
+- [ ] 미로그인 → 로그인 화면으로 보내고, 로그인 후 원래 요청으로 복귀
+- [ ] code 발급: 충분히 긴 랜덤, **1회용**, 짧은 만료(≤ 10분, 권장 1분)
+- [ ] code 에 묶어 저장: client_id, redirect_uri, user_id, scope, nonce, code_challenge, auth_time
+- 스펙: RFC 6749 §4.1.1–4.1.2, OIDC Core §3.1.2
+
+### 단계 5 — `POST /token` (grant_type=authorization_code)
+- [ ] Client 인증 (`Authorization: Basic`), secret 은 해시 저장·상수시간 비교
+- [ ] code 존재·미사용·미만료·**발급받은 client 와 동일** 확인
+- [ ] `redirect_uri` 가 authorize 때 값과 동일
+- [ ] PKCE: `BASE64URL(SHA256(code_verifier)) == code_challenge`
+- [ ] code 즉시 소진. 이미 쓴 code 재사용 시 그 code 로 발급한 토큰 폐기 고려
+- [ ] ID Token claims: `iss`, `sub`, `aud`(=client_id), `exp`, `iat`, `auth_time`, `nonce`(요청 시)
+- [ ] scope 에 따라 `email`, `email_verified`, `name`, `picture` 등 포함
+- [ ] 응답 헤더 `Cache-Control: no-store`
+- [ ] RP: id_token 검증 — 서명(JWKS), `iss`, `aud`, `exp`, `nonce` → 세션 생성
+- 스펙: OIDC Core §3.1.3, RFC 6749 §4.1.3, RFC 7636 §4.6
+
+### 단계 6 — PKCE 점검
+- [ ] PKCE 없이/틀린 verifier 로 요청 시 거부되는 것을 직접 확인
+- [ ] PKCE 가 막는 공격(code 가로채기) 설명 가능
+- 스펙: RFC 7636
+
+### 단계 7 — `GET /userinfo`
+- [ ] `Authorization: Bearer <access_token>` 검증 (서명·만료·`aud`/issuer)
+- [ ] 토큰의 scope 에 따라 claim 반환, `sub` 는 id_token 과 동일
+- 스펙: OIDC Core §5.3
+
+### 단계 8 — 동의(consent)
+- [ ] 처음 접근하는 client + scope 조합이면 동의 화면
+- [ ] 동의 저장 → 다음엔 생략. 더 넓은 scope 요청 시 다시 동의
+- [ ] 계정 화면에서 동의 철회 (기존 `services-section` 연결)
+
+### 단계 9 — Refresh token & 로그아웃
+- [ ] `offline_access` scope 일 때만 refresh token 발급
+- [ ] `grant_type=refresh_token`: rotation (쓸 때마다 새로 발급, 옛 것 폐기), 재사용 감지 시 계열 전체 폐기
+- [ ] RP-Initiated Logout (`end_session_endpoint`, `id_token_hint`, `post_logout_redirect_uri` 등록값 일치)
+- 스펙: RFC 6749 §6, RFC 9700(OAuth 2.0 Security BCP), OIDC RP-Initiated Logout 1.0
+
+### 단계 10 — better-auth OIDC 플러그인 제거
+- [ ] `jwt()`, `oauthProvider()` 제거, 관련 테이블 마이그레이션 정리
+- [ ] web 의 consent/services 화면을 새 API 로 연결
+- [ ] 기존 기능 회귀 확인
+
+## 6. 데이터 모델 (초안 — 단계 진행하며 학습자가 확정)
+
+| 테이블 | 핵심 컬럼 | 도입 단계 |
+|---|---|---|
+| `oidc_signing_key` | kid, public_jwk, private_jwk(암호화), created_at, active | 3 |
+| `oidc_client` | client_id, client_secret_hash, redirect_uris[], post_logout_redirect_uris[], name | 4 |
+| `oidc_authorization_code` | code_hash, client_id, user_id, redirect_uri, scope, nonce, code_challenge, expires_at, used_at | 4 |
+| `oidc_consent` | user_id, client_id, scopes[], created_at | 8 |
+| `oidc_refresh_token` | token_hash, family_id, client_id, user_id, scope, expires_at, revoked_at | 9 |
+
+기존 better-auth 의 `jwks`, `oauth_*` 테이블은 단계 10 에서 정리.
+
+## 7. 진행 상태
+
+- 현재 단계: **단계 0** (질문 답변 및 해설 완료, 오답 복습 대기)
+- 학습 브랜치: (미정)
+
+| 단계 | 상태 |
+|---|---|
+| 0 흐름 이해 | ⏳ 진행 중 |
+| 1 최소 RP | ⬜ |
+| 2 Discovery | ⬜ |
+| 3 JWKS | ⬜ |
+| 4 authorize | ⬜ |
+| 5 token | ⬜ |
+| 6 PKCE | ⬜ |
+| 7 userinfo | ⬜ |
+| 8 consent | ⬜ |
+| 9 refresh/logout | ⬜ |
+| 10 better-auth 제거 | ⬜ |
+
+## 8. 학습 로그
+
+> 단계마다: 날짜, 학습자가 이해한 것, 헷갈렸던 것, 리뷰에서 나온 지적. 다음 세션의 설명 깊이 조절에 쓴다.
+
+- 2026-10-12: 학습 시작. 스펙 작성. 단계 0 확인 질문 제시.
+- 2026-10-12: 단계 0 답변. state=CSRF 는 정답. code 의 존재 이유, ID/Access Token 방향,
+  JWKS 서명 검증은 아직 모름 → 해설 후 오답 노트 기록. 특히 토큰의 **방향(누가 발급, 누가 받음)** 을 헷갈림.
+- 2026-10-12: 후속 질문에서 "secret 으로 code 를 연다"는 오개념 발견(0-5). 서명 ≠ 암호화 구분이 약함.
+  공개키/개인키를 도장·인감 비유로 재설명, id_token 처리 5단계 설명. 응용 질문 3개 출제.
+- 2026-10-12: 응용 결과 Q1 ❌ Q2 ❌ Q3 ✅. 서명 검증 원리가 와닿지 않음 → 토이 RSA 숫자 예시로 설명.
+  kid 오개념(0-7) 기록. 다음: jose 로 서명/검증/위조 실습(선택) 후 단계 0 재점검.
+- 2026-10-12: 실습은 보류(학습자 요청). "공개키로 푼다" → "확인한다"로 교정(내용은 누구나 읽음).
+  `sub` 가 뭔지 질문 → 설명함(IdP 내 불변 사용자 ID, email 대신 (iss, sub) 로 식별). 복습 때 sub vs email 응용 질문 후보.
+- 2026-10-12: "공개키로 개인키를 역산하면 뚫리지 않나?" 질문 → 토이 n=33 은 인수분해로 역산 가능, 2048비트는 사실상 불가능하다고 설명.
+  실제 위협은 수학이 아니라 개인키 유출과 RP 검증 실수(`alg: none`, 알고리즘 혼동) → 단계 5 에서 RP 가 alg 를 RS256 으로 고정하도록 다룰 것.
+- 2026-10-12: 수학 설명이 와닿지 않음 → **수식 대신 비유로 설명할 것**(곱셈↔소인수분해, 스무디). 구현에 수학 이해는 불필요, 규칙만 기억하면 됨을 강조.
+
+## 9. 오답 노트 (복습용)
+
+> 상태: ✅ 정답 · △ 부분 정답 · ❌ 오답/모름. 복습할 때마다 `→ 날짜 결과` 를 이어 붙인다.
+> 응용 질문은 아래 "핵심 포인트"를 다른 각도에서 묻는다.
+
+### 단계 0 — 흐름 이해
+
+| # | 날짜 | 질문 | 학습자 답 | 상태 | 핵심 포인트 (정답) | 복습 이력 |
+|---|---|---|---|---|---|---|
+| 0-1 | 2026-10-12 | 토큰 대신 code 를 거치는 이유 | "등록된 RP 인지 확인하려고?" | △ | 브라우저(front-channel)는 URL 이 히스토리·Referer·로그·확장프로그램으로 새는 **불안전한 통로**다. 그래서 거기엔 단독으로 쓸모없는 1회용 code 만 싣는다. 토큰은 서버 간(back-channel)에서 client_secret(+PKCE)으로 **RP 를 인증한 뒤에만** 받는다. 답의 "RP 확인"은 token 단계의 client 인증 부분이라 반은 맞음 | |
+| 0-2 | 2026-10-12 | `state` 의 목적 | "CSRF 방지" | ✅ | 공격자가 자기 code 를 담은 callback URL 을 피해자 브라우저에 열게 하면, 피해자가 **공격자 계정으로 로그인**된다(login CSRF). RP 가 보낸 요청과 돌아온 callback 을 state 로 묶어 막는다 | |
+| 0-3 | 2026-10-12 | ID Token vs Access Token | "ID Token 은 RP 가 IdP 에 보내고, 등록돼 있으면 Access Token 발급" | ❌ | **둘 다 IdP 가 발급해서 RP 에게 준다.** ID Token: RP 가 직접 읽는 "누가 로그인했나" 증명서(`aud`=RP 의 client_id). API 에 보내면 안 됨. Access Token: RP 가 API(예: /userinfo)에 `Bearer` 로 보내는 **출입증**. RP 는 내용을 해석하지 않는다. 인증(누구냐) vs 인가(뭘 해도 되냐) | 2026-10-12 응용 Q3(타 RP 의 id_token 재사용) → ✅ `aud` 확인 정답. 단 처음에 "발급처?"라고 해 `iss`(발급자)와 `aud`(수신자) 구분이 약함 |
+| 0-4 | 2026-10-12 | id_token 서명 검증 키와 출처 | "모르겠다" | ❌ | IdP 는 **개인키**로 서명하고, RP 는 IdP 의 **공개키**로 검증한다. 공개키는 discovery 문서의 `jwks_uri`(`/jwks`)에서 가져오고, JWT 헤더의 `kid` 로 어떤 키인지 고른다. 공개키라 누구나 받아도 안전하다 | 2026-10-12 응용 Q2(공격자가 자기 개인키로 서명) → ❌ 모름. 토이 RSA 숫자 예시로 재설명 |
+| 0-5 | 2026-10-12 | (0-1 해설 후 후속 질문에서 드러난 오개념) code 를 RP 가 어떻게 쓰나 | "RP 가 시크릿키로 code 를 여는 것?" | ❌ | code 는 **암호화된 것이 아니라 그냥 랜덤 문자열(번호표)**. RP 는 아무것도 열지 않고 code + client_id + client_secret 을 **IdP 의 /token 에 같이 보낸다**. IdP 가 DB 에서 code 를 찾아 "이 code 를 받은 client 가 맞나, secret 이 맞나" 확인 후 토큰을 준다. secret 은 복호화 키가 아니라 RP 의 **비밀번호** | 2026-10-12 응용 Q1(히스토리에서 code 탈취) → ❌ "code 값이 없어서"라고 답함. 공격자는 code 를 **이미 가졌다**. 없는 건 client_secret(+PKCE code_verifier). code 의 1회용·짧은 만료도 방어선 |
+| 0-6 | 2026-10-12 | (개념 질문) RP 는 id_token 을 받아서 뭘 하나 | "어떻게 처리하는지 모르겠다" | ❌ | ① JWT 헤더의 `kid` 로 JWKS 에서 공개키 선택 → ② 서명 검증 → ③ `iss`/`aud`/`exp`/`nonce` 확인 → ④ `sub` 로 RP 자체 DB 의 사용자 찾기/생성 → ⑤ **RP 자체 세션 쿠키 발급**. 그 뒤 id_token 은 더 쓰지 않는다 (호텔 체크인 때 신분증 확인 → 방 키 발급 비유) | |
+| 0-7 | 2026-10-12 | (개념 질문) JWT 헤더의 `kid` | "토큰마다 랜덤 발급? 개인키 여러 개와 매칭?" | ❌ | `kid` 는 **키 쌍의 이름표**. 키 쌍을 만들 때 한 번 정해지고(UUID 등), 그 키로 서명한 모든 토큰에 같은 kid 가 들어간다. IdP 는 보통 활성 개인키 1개로 서명하고 헤더에 그 kid 를 적는다. RP 는 JWKS(공개키 목록)에서 같은 kid 의 **공개키**를 찾는다. 매칭은 RP 쪽에서 공개키와 하는 것 | |
+
+## 10. 참고 스펙
+
+- OpenID Connect Core 1.0 — https://openid.net/specs/openid-connect-core-1_0.html
+- OpenID Connect Discovery 1.0 — https://openid.net/specs/openid-connect-discovery-1_0.html
+- OIDC RP-Initiated Logout 1.0 — https://openid.net/specs/openid-connect-rpinitiated-1_0.html
+- RFC 6749 OAuth 2.0 — https://datatracker.ietf.org/doc/html/rfc6749
+- RFC 7636 PKCE — https://datatracker.ietf.org/doc/html/rfc7636
+- RFC 7517 JWK — https://datatracker.ietf.org/doc/html/rfc7517
+- RFC 9700 OAuth 2.0 Security BCP — https://datatracker.ietf.org/doc/html/rfc9700
