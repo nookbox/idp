@@ -47,8 +47,8 @@
 | Client 인증 | `client_secret_basic` | 가장 단순한 표준 방식 |
 | IdP 서버 | `apps/auth` (NestJS) | 기존 구조 |
 | 로그인/동의 UI | `apps/auth/web` (Next.js) | 기존 구조 |
-| 테스트 RP | `apps/rp` (Next.js, 포트 4000, 최소 구성) — [stages/stage-1-rp.md](stages/stage-1-rp.md) | IdP 를 눌러보는 용도. 실제 서비스 RP 는 별도 레포 |
-| IdP 테스트 방법 | 테스트 RP + 필요하면 `curl` | |
+| RP | **이 레포에서 만들지 않음** (테스트 RP 포함). 실제 RP 는 별도 레포 → [rp-guide.md](rp-guide.md) | IdP 에만 집중 (2026-10-15 결정) |
+| IdP 테스트 방법 | 브라우저 주소창 + `curl` 로 직접 요청 | |
 | issuer (직접 구현) | `http://localhost:3001/api/oidc` | better-auth(`/api/auth`)와 겹치지 않게 공존. 단계 10 에서 정리 |
 | DB | Postgres + Drizzle | 기존 구조 |
 | 브랜치 | `feature/oidc` 에서 학습용 브랜치 분기 | |
@@ -81,9 +81,8 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 3. ID Token 과 Access Token 의 용도 차이는? (누가 읽고, 누구에게 보내는가)
 4. RP 는 id_token 서명을 무엇으로 검증하며, 그 키는 어디서 얻는가?
 
-### 단계 1 — 테스트용 RP (`apps/rp`)
-- 과제·체크리스트·리뷰 기록 → [stages/stage-1-rp.md](stages/stage-1-rp.md)
-- 실제 서비스 RP 는 별도 레포. 이건 IdP 를 눌러보는 용도
+### 단계 1 — (범위 밖) RP
+- 이 레포에서는 하지 않는다 → [rp-guide.md](rp-guide.md)
 
 ### 단계 2 — Discovery `GET /.well-known/openid-configuration`
 - [ ] `issuer`, `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, `jwks_uri`
@@ -120,7 +119,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - [ ] ID Token claims: `iss`, `sub`, `aud`(=client_id), `exp`, `iat`, `auth_time`, `nonce`(요청 시)
 - [ ] scope 에 따라 `email`, `email_verified`, `name`, `picture` 등 포함
 - [ ] 응답 헤더 `Cache-Control: no-store`
-- [ ] 발급된 id_token 을 jwt.io 등으로 열어 claim 확인 (RP 쪽 검증은 stage-1-rp.md 의 나중 단계 항목)
+- [ ] 발급된 id_token 을 jwt.io 등으로 열어 claim 확인 (RP 쪽 검증은 rp-guide.md)
 - 스펙: OIDC Core §3.1.3, RFC 6749 §4.1.3, RFC 7636 §4.6
 
 ### 단계 6 — PKCE 점검
@@ -163,14 +162,14 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 1** 테스트용 RP (2026-10-15 시작)
+- 현재 단계: **단계 2** Discovery (학습자 구현)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
 |---|---|
 | 0 흐름 이해 | ✅ (약점 복습 계속: 세션 쿠키 내용, 상황 문제 끝까지 답하기, 비교 주체) |
-| 1 테스트용 RP | ⏳ 진행 중 → [stages/stage-1-rp.md](stages/stage-1-rp.md) |
-| 2 Discovery | ⬜ 과제 준비됨 → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
+| 1 RP | ⏭ 범위 밖 (이 레포는 IdP 만) |
+| 2 Discovery | ⏳ 진행 중 → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
 | 3 JWKS | ⬜ |
 | 4 authorize | ⬜ |
 | 5 token | ⬜ |
@@ -227,6 +226,9 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - 2026-10-15: 범위 변경 — 이 레포는 IdP 만. RP 는 별도 레포에서(단계 1 과제는 rp-guide.md 로 이동). IdP 는 브라우저+curl 로 테스트.
   직접 구현 issuer 는 `/api/oidc` 로 두어 better-auth `/api/auth` 와 공존. 단계 2(Discovery)부터 시작.
 - 2026-10-15: 다시 변경 — 이 레포에 **테스트용 RP(`apps/rp`)** 를 만들기로 함. 실제 서비스 RP 는 별도 레포. 단계 1 부활, 단계 2 과제는 미리 준비해 둠.
+- 2026-10-15: 테스트 RP 는 학습자 요청으로 멘토가 구현(Next.js 대신 의존성 없는 `apps/rp/server.mjs`). 학습 대상은 IdP. 학습자는 RP 코드 읽기 과제 후 단계 2 진행.
+- 2026-10-15: 테스트 RP 도 삭제하고 **IdP 에만 집중**하기로 확정. RP 메모는 rp-guide.md. 테스트는 브라우저+curl.
+  주의: 로컬 3001 포트를 아몬드영 서버가 쓰고 있었음 → 우리 IdP 를 띄울 때 포트 충돌 확인 필요.
 
 ## 9. 오답 노트 (복습용)
 

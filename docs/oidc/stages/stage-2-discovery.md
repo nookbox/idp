@@ -1,6 +1,6 @@
 # 단계 2: Discovery 문서 만들기
 
-> 상태: ⬜ 단계 1 다음 (과제 미리 준비)
+> 시작: 2026-10-15 · 상태: ⏳ 진행 중
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 2 구현 과제와 리뷰 기록만 담는다.
 
 ## 무엇을 만드나
@@ -19,6 +19,7 @@ GET http://localhost:3001/api/oidc/.well-known/openid-configuration
 
 - 브랜치: `feature/oidc`
 - better-auth 가 이미 `/api/auth` 를 쓰고 있다. 우리가 만드는 IdP 는 **`/api/oidc`** 아래에 둔다. (단계 10 에서 정리)
+- ⚠️ 로컬에서 **3001 포트를 아몬드영 서버가 쓰고 있을 수 있다**. `lsof -i :3001` 로 확인하고, 우리 IdP(`pnpm dev`)가 3001 에 떠 있는지 먼저 본다
 - `apps/auth/.env` 에 추가:
   ```
   OIDC_ISSUER=http://localhost:3001/api/oidc
