@@ -11,7 +11,7 @@ RP 가 우리 IdP 를 처음 만났을 때 "로그인은 어디로 보내? 토�
 > 놀이공원 비유: 주민센터 입구에 붙은 **층별 안내도**. "신원 확인은 2층, 신분증 발급은 3층, 도장 견본은 1층 게시판"
 
 ```
-GET http://localhost:3001/api/oidc/.well-known/openid-configuration
+GET http://localhost:3011/api/oidc/.well-known/openid-configuration
 → { "issuer": "...", "authorization_endpoint": "...", ... }
 ```
 
@@ -19,11 +19,8 @@ GET http://localhost:3001/api/oidc/.well-known/openid-configuration
 
 - 브랜치: `feature/oidc`
 - better-auth 가 이미 `/api/auth` 를 쓰고 있다. 우리가 만드는 IdP 는 **`/api/oidc`** 아래에 둔다. (단계 10 에서 정리)
-- ⚠️ 로컬에서 **3001 포트를 아몬드영 서버가 쓰고 있을 수 있다**. `lsof -i :3001` 로 확인하고, 우리 IdP(`pnpm dev`)가 3001 에 떠 있는지 먼저 본다
-- `apps/auth/.env` 에 추가:
-  ```
-  OIDC_ISSUER=http://localhost:3001/api/oidc
-  ```
+- 로컬 IdP 포트는 **3011** (3001 은 아몬드영 서버와 충돌해서 2026-10-15 변경). `apps/auth/.env` 의 `PORT`·`BETTER_AUTH_URL`, `apps/auth/web/.env` 의 `NEXT_PUBLIC_AUTH_URL` 에 반영됨
+- `apps/auth/.env` 의 `OIDC_ISSUER=http://localhost:3011/api/oidc` (설정 완료)
 
 ## 만들 것
 
@@ -59,7 +56,7 @@ JSON 으로 아래 항목을 돌려준다.
 ## 완료 확인 방법
 
 ```bash
-curl -s http://localhost:3001/api/oidc/.well-known/openid-configuration | jq
+curl -s http://localhost:3011/api/oidc/.well-known/openid-configuration | jq
 ```
 1. JSON 이 나오고 위 11개 항목이 다 있다
 2. `issuer` 가 `.env` 값과 **글자 하나까지** 같다 (끝에 `/` 없음)

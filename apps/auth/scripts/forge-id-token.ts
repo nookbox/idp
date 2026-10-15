@@ -28,7 +28,7 @@ const TARGET_SUB = process.env.FORGE_SUB ?? 'DPFFEjrvhE3795hShRrIKLoNvObblocm';
 const TARGET_EMAIL = process.env.FORGE_EMAIL ?? 'wndtlr1024@gmail.com';
 const TARGET_NAME = process.env.FORGE_NAME ?? 'Forged User';
 
-const ISSUER = 'http://localhost:3001/api/auth';
+const ISSUER = 'http://localhost:3011/api/auth';
 const AUDIENCE = 'skiiXbLedgnsTGGbukgHmZkgFQXMDwog'; // nook client_id
 
 async function main(): Promise<void> {
@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   console.log('\n=== 위조된 id_token (jwt.io 에 붙여넣으세요) ===');
   console.log(forgedToken);
   console.log('\n검증 방법:');
-  console.log('  curl http://localhost:3001/api/auth/jwks  ← 진짜 IdP 공개키');
+  console.log('  curl http://localhost:3011/api/auth/jwks  ← 진짜 IdP 공개키');
   console.log(
     '  jwt.io 의 verify signature 에 그 공개키 넣어보면 valid 라고 표시됨.',
   );

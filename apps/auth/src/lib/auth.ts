@@ -14,7 +14,7 @@ import {
   sendVerificationLinkEmail,
 } from './mailer';
 
-const authServerUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3001';
+const authServerUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3011';
 const authWebUrl = process.env.WEB_URL ?? 'http://localhost:3000';
 const oidcScopes = ['openid', 'profile', 'email', 'offline_access'];
 

@@ -49,7 +49,7 @@
 | 로그인/동의 UI | `apps/auth/web` (Next.js) | 기존 구조 |
 | RP | **이 레포에서 만들지 않음** (테스트 RP 포함). 실제 RP 는 별도 레포 → [rp-guide.md](rp-guide.md) | IdP 에만 집중 (2026-10-15 결정) |
 | IdP 테스트 방법 | 브라우저 주소창 + `curl` 로 직접 요청 | |
-| issuer (직접 구현) | `http://localhost:3001/api/oidc` | better-auth(`/api/auth`)와 겹치지 않게 공존. 단계 10 에서 정리 |
+| issuer (직접 구현) | `http://localhost:3011/api/oidc` | better-auth(`/api/auth`)와 겹치지 않게 공존. 단계 10 에서 정리 |
 | DB | Postgres + Drizzle | 기존 구조 |
 | 브랜치 | `feature/oidc` 에서 학습용 브랜치 분기 | |
 
@@ -229,6 +229,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - 2026-10-15: 테스트 RP 는 학습자 요청으로 멘토가 구현(Next.js 대신 의존성 없는 `apps/rp/server.mjs`). 학습 대상은 IdP. 학습자는 RP 코드 읽기 과제 후 단계 2 진행.
 - 2026-10-15: 테스트 RP 도 삭제하고 **IdP 에만 집중**하기로 확정. RP 메모는 rp-guide.md. 테스트는 브라우저+curl.
   주의: 로컬 3001 포트를 아몬드영 서버가 쓰고 있었음 → 우리 IdP 를 띄울 때 포트 충돌 확인 필요.
+- 2026-10-15: 로컬 IdP 포트를 **3011** 로 변경(.env 만, 운영은 3001 유지). `OIDC_ISSUER` 를 `http://localhost:3011/api/oidc` 로 수정.
 
 ## 9. 오답 노트 (복습용)
 

@@ -20,7 +20,7 @@ IdP 는 아직 없다. 이번에는 **RP 쪽의 1~4번, 그리고 7번 state 비
 - 파일: **`apps/rp/server.mjs`** 하나. 의존성 없음(Node 기본 모듈 `node:http`, `node:crypto` 만 사용). Next.js 아님
 - 실행: `node apps/rp/server.mjs` → http://localhost:4000
 - 설정은 기본값이 들어 있어서 `.env` 없이 바로 돈다. 바꾸고 싶으면 환경변수로:
-  `OIDC_ISSUER`(기본 `http://localhost:3001/api/oidc`), `OIDC_CLIENT_ID`(기본 `shop`), `OIDC_REDIRECT_URI`, `PORT`
+  `OIDC_ISSUER`(기본 `http://localhost:3011/api/oidc`), `OIDC_CLIENT_ID`(기본 `shop`), `OIDC_REDIRECT_URI`, `PORT`
 - 쿠키 이름은 `rp_state`, `rp_nonce`, `rp_verifier`. localhost 에서 IdP 쿠키와 섞이지 않게 접두어를 붙였다 (쿠키는 포트를 구분하지 않는다)
 
 | 경로 | 하는 일 | 그림 번호 |
@@ -40,7 +40,7 @@ IdP 는 아직 없다. 이번에는 **RP 쪽의 1~4번, 그리고 7번 state 비
 ## 완료 확인 방법
 
 0. `node apps/rp/server.mjs` 실행 후 http://localhost:4000 접속
-1. 버튼 클릭 → 주소창이 `localhost:3001/api/oidc/authorize?...` 로 바뀜 (404 정상). **파라미터 8개**(nonce 포함) 확인
+1. 버튼 클릭 → 주소창이 `localhost:3011/api/oidc/authorize?...` 로 바뀜 (404 정상). **파라미터 8개**(nonce 포함) 확인
 2. 개발자 도구 → Application → Cookies 에서 state, verifier 쿠키 확인
 3. `localhost:4000/callback?code=test&state=틀린값` → **거부**
 4. 쿠키의 state 값으로 `?state=그값` → **통과**

@@ -74,7 +74,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const port = Number(process.env.PORT) || 3001;
+  const port = Number(process.env.PORT) || 3011;
   await app.listen(port);
 
   const logger = new Logger('Bootstrap');

@@ -10,7 +10,7 @@ export const authClient = createAuthClient({
   baseURL:
     process.env.AUTH_INTERNAL_URL ??
     process.env.NEXT_PUBLIC_AUTH_URL ??
-    'http://localhost:3001',
+    'http://localhost:3011',
   plugins: [
     // 서버 auth.ts 의 user.additionalFields 와 동일하게 유지
     inferAdditionalFields({

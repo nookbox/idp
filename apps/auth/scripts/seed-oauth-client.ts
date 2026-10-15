@@ -324,7 +324,7 @@ async function main(): Promise<void> {
 
   console.log('\n=== 공통 RP 설정 ===');
   console.log(
-    `OIDC_ISSUER=${process.env.BETTER_AUTH_URL ?? 'http://localhost:3001'}/api/auth`,
+    `OIDC_ISSUER=${process.env.BETTER_AUTH_URL ?? 'http://localhost:3011'}/api/auth`,
   );
   console.log(
     '\n잃어버린 client_secret 은 복원 불가. oauth_client 테이블에서 해당 row 를',

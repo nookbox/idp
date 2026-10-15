@@ -1,6 +1,6 @@
 // 이 서버의 공개 주소. 절대 URL 을 만들 때 쓴다.
 export const AUTH_SERVER_URL =
-  process.env.BETTER_AUTH_URL ?? 'http://localhost:3001';
+  process.env.BETTER_AUTH_URL ?? 'http://localhost:3011';
 
 export const REQUEST_ID_TOKEN_HEADER = 'x-request-id';
 

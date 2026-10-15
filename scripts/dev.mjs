@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 
 const WEB_PORT = Number(process.env.WEB_PORT) || 3000;
-const AUTH_PORT = Number(process.env.PORT) || 3001;
+const AUTH_PORT = Number(process.env.PORT) || 3011;
 
 const MAIL_PORT = Number(process.env.MAIL_PREVIEW_PORT) || 3002;
 
