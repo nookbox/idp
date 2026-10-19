@@ -40,7 +40,6 @@
     }
   },
   "dependencies": {
-    "@better-auth/oauth-provider": "^1.7.6",
     "@nestjs/common": "^11.0.10",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.10",
@@ -48,8 +47,6 @@
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.5.0",
     "@nook/email": "workspace:*",
-    "@thallesp/nestjs-better-auth": "^2.7.0",
-    "better-auth": "^1.7.6",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^17.4.2",

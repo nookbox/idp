@@ -1,21 +1,4 @@
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { authClient } from '@/shared/api/auth-client';
-import { AccountView } from '@/views/account';
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ verified?: string; error?: string }>;
-}) {
-  const { data: session } = await authClient.getSession({
-    fetchOptions: {
-      headers: { cookie: (await headers()).get('cookie') ?? '' },
-    },
-  });
-  if (!session) redirect('/signin');
-
-  const { verified, error } = await searchParams;
-
-  return <AccountView verified={verified === '1'} verificationError={error} />;
+// ponytail: better-auth 제거로 로그인·계정 화면을 걷어냄. Phase 2 에서 직접 만든 세션으로 다시 붙인다
+export default function Home() {
+  return null;
 }

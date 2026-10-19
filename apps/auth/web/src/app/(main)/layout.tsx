@@ -1,5 +1,4 @@
 import { Header } from '@/widgets/header';
-import { UserMenu } from '@/widgets/user-menu';
 
 export default function MainLayout({
   children,
@@ -8,9 +7,7 @@ export default function MainLayout({
 }>) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <Header>
-        <UserMenu />
-      </Header>
+      <Header />
       {children}
     </div>
   );

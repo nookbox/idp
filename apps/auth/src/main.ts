@@ -5,12 +5,6 @@ import { resolve } from 'path';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import {
-  oauthProviderAuthServerMetadata,
-  oauthProviderOpenIdConfigMetadata,
-} from '@better-auth/oauth-provider';
-import { toNodeHandler } from 'better-auth/node';
-import type { Express } from 'express';
 import { RequestIdMiddleware } from './common';
 import {
   AVATAR_DIR,
@@ -18,12 +12,9 @@ import {
 } from './modules/avatars/constants/avatars.constants';
 
 import { AppModule } from './app.module';
-import { auth } from './lib/auth';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bodyParser: false, // Required for Better Auth
-  });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configuredCorsOrigins = (process.env.CORS_ORIGIN ?? '')
     .split(',')
@@ -49,22 +40,6 @@ async function bootstrap(): Promise<void> {
   // resolve 를 쓰는 이유는 AVATAR_DIR 이 개발에서는 상대 경로,
   // 운영에서는 볼륨 절대 경로(/data/avatars)로 들어오기 때문이다.
   app.useStaticAssets(resolve(AVATAR_DIR), { prefix: AVATAR_PUBLIC_PATH });
-
-  // OIDC / OAuth 2.0 디스커버리 메타데이터.
-  // issuer path가 /api/auth이므로 RFC 8414/OIDC Discovery 규칙에 맞춰
-  //  - openid-configuration: issuer path 뒤에 .well-known을 붙임
-  //  - oauth-authorization-server: .well-known 뒤에 issuer path를 붙임
-  // AuthModule 이 /api/auth catch-all 을 붙이는 시점은 app.listen() 안의
-  // init() 이라, 여기서 먼저 등록해두면 express 스택에서 앞선다.
-  const expressApp = app.getHttpAdapter().getInstance() as Express;
-  expressApp.get(
-    '/api/auth/.well-known/openid-configuration',
-    toNodeHandler(oauthProviderOpenIdConfigMetadata(auth)),
-  );
-  expressApp.get(
-    '/.well-known/oauth-authorization-server/api/auth',
-    toNodeHandler(oauthProviderAuthServerMetadata(auth)),
-  );
 
   app.useGlobalPipes(
     new ValidationPipe({

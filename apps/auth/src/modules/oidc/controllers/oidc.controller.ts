@@ -1,10 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { env } from '@/config/oidc-config';
-import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 
 @Controller('oidc')
 export class OidcController {
-  @AllowAnonymous()
   @Get('.well-known/openid-configuration')
   getOidc() {
     return {

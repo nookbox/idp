@@ -69,19 +69,6 @@ RUN pnpm --filter "@nook/auth..." build
 # --prod: devDependencies 제외 / --legacy: pnpm 10에서 공유 lockfile 워크스페이스에 필요
 RUN pnpm --filter @nook/auth deploy --prod --legacy /out
 
-# better-auth는 지원하는 모든 프레임워크(next, react, svelte, vue, prisma...)를
-# optional peerDependency로 선언한다. 원래는 안 깔려야 하는데,
-# 이 워크스페이스에는 Next 앱(@nook/auth-web)이 같이 있고 .npmrc에
-# dedupe-peer-dependents=true 라서 better-auth 해석이 두 앱 사이에 공유된다.
-# 그 결과 API 서버인 여기에도 next + swc 바이너리가 290MB쯤 딸려온다.
-#
-# 이 서버는 better-auth/node 만 쓰므로 전부 죽은 무게다. 명시적으로 제거한다.
-# (제거 후 실제로 부팅되는지 아래 HEALTHCHECK와 별개로 반드시 실행 검증할 것)
-RUN rm -rf /out/node_modules/.pnpm/next@* \
-           /out/node_modules/.pnpm/@next+* \
-           /out/node_modules/next \
-           /out/node_modules/@next
-
 # =============================================================
 # (별도) migrate — drizzle 마이그레이션 전용 이미지
 # =============================================================
@@ -98,34 +85,6 @@ COPY apps/auth/src apps/auth/src
 
 WORKDIR /repo/apps/auth
 CMD ["pnpm", "exec", "drizzle-kit", "migrate"]
-
-# =============================================================
-# (별도) seed — RP(OAuth client) 등록 전용 이미지
-# =============================================================
-# tsx 도 devDependency 라 runner 에는 없다. migrate 와 같은 이유로 분리한다.
-#
-#   docker compose --env-file .env.prod -f docker-compose.prod.yml \
-#     --profile seed run --rm --build seed
-#
-# ⚠️ --build 를 빼면 안 된다. compose run 은 이미지가 있으면 그대로 쓴다.
-#    등록할 client 목록이 이 이미지 안에 COPY 된 스크립트에 들어있어서,
-#    옛 이미지로 돌리면 옛 설정으로 등록되고도 성공한 것처럼 끝난다.
-#
-# deps 가 아니라 build 에서 출발하는 이유: 이 스크립트가 src/lib/auth 를 import 하고
-# 그게 @nook/email 을 끌어온다. @nook/email 의 main 은 dist/index.js 라서
-# 빌드가 끝난 스테이지가 아니면 import 부터 깨진다.
-#
-# ⚠️ 운영 postgres 는 호스트 포트를 열지 않는다. 그래서 맥에서 직접 못 돌리고
-#    compose 네트워크 안의 일회성 컨테이너로 돌려야 한다.
-#
-# ⚠️ client_secret 은 생성 시 딱 한 번만 평문으로 출력된다. 로그를 놓치면
-#    oauth_client 의 해당 row 를 지우고 다시 돌려서 새로 발급받는 수밖에 없다.
-FROM build AS seed
-
-COPY apps/auth/scripts apps/auth/scripts
-
-WORKDIR /repo/apps/auth
-CMD ["pnpm", "exec", "tsx", "scripts/seed-oauth-client.ts"]
 
 # =============================================================
 # 3단계: runner — 실제로 배포되는 이미지 (기본 타깃이라 맨 끝에 둔다)
