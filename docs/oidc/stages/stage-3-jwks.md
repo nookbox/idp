@@ -19,7 +19,7 @@ GET http://localhost:3011/api/oidc/jwks
 
 ## 준비
 
-- `jose` 는 이미 설치돼 있다 (`apps/auth/package.json`). 단, 지금은 devDependencies 라 운영 이미지(`--prod`)에는 빠진다 → `dependencies` 로 옮길 것
+- `jose` 는 이미 설치돼 있다 (`apps/auth/package.json` dependencies, 2026-10-19 devDependencies 에서 옮김)
 - better-auth 는 2026-10-19 에 전부 제거됨. `jwks` 이름이 비었으니 그대로 쓴다
 - 스키마는 `src/database/schema/` 에 새 파일(`oidc.ts`)로 두고 `index.ts` 에서 export. 마이그레이션은 `pnpm db:generate` → `pnpm db:migrate`
 
