@@ -13,6 +13,7 @@ import { HealthController } from './health.controller';
 import { auth } from './lib/auth';
 import { AuthModule } from './modules/auth/auth.module';
 import { AvatarsModule } from './modules/avatars/avatars.module';
+import { OidcModule } from './modules/oidc/oidc.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AvatarsModule } from './modules/avatars/avatars.module';
     DatabaseModule,
     AuthModule,
     AvatarsModule,
+    OidcModule,
   ],
   controllers: [HealthController],
   providers: [

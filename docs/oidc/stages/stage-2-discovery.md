@@ -1,6 +1,6 @@
 # 단계 2: Discovery 문서 만들기
 
-> 시작: 2026-10-15 · 상태: ⏳ 진행 중
+> 시작: 2026-10-15 · 완료: 2026-10-19 · 상태: ✅
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 2 구현 과제와 리뷰 기록만 담는다.
 
 ## 무엇을 만드나
@@ -25,25 +25,25 @@ GET http://localhost:3011/api/oidc/.well-known/openid-configuration
 ## 만들 것
 
 ### ① 모듈 뼈대
-- [ ] `apps/auth/src/modules/oidc/` 에 모듈과 컨트롤러 만들기 (`oidc.module.ts`, `oidc.controller.ts`)
-- [ ] `app.module.ts` 에 등록
+- [x] `apps/auth/src/modules/oidc/` 에 모듈과 컨트롤러 만들기 (`oidc.module.ts`, `oidc.controller.ts`)
+- [x] `app.module.ts` 에 등록
 - 참고: 같은 폴더의 `avatars` 모듈이 이 레포의 모듈 작성 방식이다. 그대로 따라 하면 된다.
 - 컨트롤러 경로를 `oidc` 로 두면 전역 prefix `api` 가 붙어서 `/api/oidc/...` 가 된다 (`main.ts` 의 `setGlobalPrefix`)
 
 ### ② `GET /api/oidc/.well-known/openid-configuration`
 JSON 으로 아래 항목을 돌려준다.
 
-- [ ] `issuer`: `.env` 의 `OIDC_ISSUER` 값 **그대로**
-- [ ] `authorization_endpoint`: `{issuer}/authorize`
-- [ ] `token_endpoint`: `{issuer}/token`
-- [ ] `userinfo_endpoint`: `{issuer}/userinfo`
-- [ ] `jwks_uri`: `{issuer}/jwks`
-- [ ] `response_types_supported`: `["code"]`
-- [ ] `subject_types_supported`: `["public"]`
-- [ ] `id_token_signing_alg_values_supported`: `["RS256"]`
-- [ ] `scopes_supported`: `["openid", "profile", "email", "offline_access"]`
-- [ ] `code_challenge_methods_supported`: `["S256"]`
-- [ ] `token_endpoint_auth_methods_supported`: `["client_secret_basic"]`
+- [x] `issuer`: `.env` 의 `OIDC_ISSUER` 값 **그대로**
+- [x] `authorization_endpoint`: `{issuer}/authorize`
+- [x] `token_endpoint`: `{issuer}/token`
+- [x] `userinfo_endpoint`: `{issuer}/userinfo`
+- [x] `jwks_uri`: `{issuer}/jwks`
+- [x] `response_types_supported`: `["code"]`
+- [x] `subject_types_supported`: `["public"]`
+- [x] `id_token_signing_alg_values_supported`: `["RS256"]`
+- [x] `scopes_supported`: `["openid", "profile", "email", "offline_access"]`
+- [x] `code_challenge_methods_supported`: `["S256"]`
+- [x] `token_endpoint_auth_methods_supported`: `["client_secret_basic"]`
 
 > authorize, token, userinfo, jwks 는 **아직 없어도 된다.** 단계 3~7 에서 하나씩 만든다. 지금은 "주소를 알려주기"만.
 
@@ -70,11 +70,16 @@ curl -s http://localhost:3011/api/oidc/.well-known/openid-configuration | jq
 
 > 내 답:
 >
-> -
-> -
+> - IdP 가 단일 진실원(source of truth)이 되어 한 군데에서만 주소를 바꾸면 된다 ✅
+> - 인식을 못하고 실패한다 △ (RP 는 설정한 issuer 와 iss 를 **글자 하나까지** 비교 → 끝 `/` 하나로 모든 사용자 로그인 실패)
 
 ## 리뷰 기록
 
 > 학습자가 "단계 2 다 했어"라고 하면 멘토가 여기에 날짜별로 지적·잘한 점·수정 여부를 기록한다.
 
-(아직 없음)
+- 2026-10-15: 학습자가 구글 discovery 를 그대로 붙여넣음 → 멘토 지적: 미지원 항목(device/revocation 등)과
+  `token`·`id_token` response type, PKCE `plain`, `client_secret_post` 는 **거짓 약속**이라 제거. 주소는 issuer 로 조립.
+  학습자 요청으로 정리·issuer 조립은 멘토가 수정(`OIDC_ISSUER` 없으면 기동 시 에러). 타입 검사 통과, curl 확인은 학습자 몫.
+  출제: PKCE `plain` 을 남기면 authorize URL 을 본 공격자가 무엇을 알게 되나 → △, 단계 6 에서 복습.
+- 2026-10-19: 401 → better-auth 전역 가드. `@AllowAnonymous()` 를 **메서드에** 붙임(좋음: authorize 는 세션 필요하니 클래스 전체를 열면 안 됨).
+  완료 확인 1~4 모두 통과(11개 항목, issuer 일치, 주소가 issuer 로 시작, `/api/auth` discovery 200). 생각해볼 질문 Q1 ✅ Q2 △. **단계 2 완료**

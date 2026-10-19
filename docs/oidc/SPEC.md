@@ -29,6 +29,10 @@
 
 ### Phase 2 — 회원/세션까지 직접 구현 (Phase 1 완료 후)
 - 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현 → better-auth 완전 제거
+- **better-auth 에 기대고 있어서 같이 직접 만들어야 하는 것** (Phase 1 진행 중 발견할 때마다 추가):
+  - [ ] 전역 인증 가드 (`@thallesp/nestjs-better-auth` 의 `AuthGuard`, 세션 없으면 401)
+  - [ ] `@AllowAnonymous()` 데코레이터 — 가드가 읽는 메타데이터와 짝이라 가드와 **같이** 만든다.
+        현재 사용처: `health.controller.ts`, `modules/oidc/controllers/oidc.controller.ts` (단계 2 discovery 공개용)
 - 세부 스펙은 Phase 1 끝난 뒤 작성
 
 ### 범위 밖 (YAGNI)
@@ -162,15 +166,15 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 2** Discovery (학습자 구현)
+- 현재 단계: **단계 3** 서명키 & JWKS (학습자 구현)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
 |---|---|
 | 0 흐름 이해 | ✅ (약점 복습 계속: 세션 쿠키 내용, 상황 문제 끝까지 답하기, 비교 주체) |
 | 1 RP | ⏭ 범위 밖 (이 레포는 IdP 만) |
-| 2 Discovery | ⏳ 진행 중 → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
-| 3 JWKS | ⬜ |
+| 2 Discovery | ✅ → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
+| 3 JWKS | ⏳ 진행 중 → [stages/stage-3-jwks.md](stages/stage-3-jwks.md) |
 | 4 authorize | ⬜ |
 | 5 token | ⬜ |
 | 6 PKCE | ⬜ |
@@ -229,7 +233,17 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - 2026-10-15: 테스트 RP 는 학습자 요청으로 멘토가 구현(Next.js 대신 의존성 없는 `apps/rp/server.mjs`). 학습 대상은 IdP. 학습자는 RP 코드 읽기 과제 후 단계 2 진행.
 - 2026-10-15: 테스트 RP 도 삭제하고 **IdP 에만 집중**하기로 확정. RP 메모는 rp-guide.md. 테스트는 브라우저+curl.
   주의: 로컬 3001 포트를 아몬드영 서버가 쓰고 있었음 → 우리 IdP 를 띄울 때 포트 충돌 확인 필요.
+- 2026-10-15: 단계 2 discovery 구현(구글 예시 붙여넣기 → 멘토가 미지원 항목 제거·issuer 조립). 학습자가 zod 로 `OIDC_ISSUER`(url, 끝 `/` 금지) 검증 추가 — 좋음.
+  PKCE plain 질문 △(2-1). code_challenge 흐름이 그려지지 않음 → 스무디·자물쇠 비유 모두 안 통함.
+  **비유보다 시퀀스 다이어그램이 통함**. 학습자 요청으로 앞으로 흐름 설명은 학습자 위키 그림(1~11번)을 기준으로 함:
+  https://github.com/nookbox/idp/wiki/%EA%B8%B0%EB%A1%9D-oidc-%EC%A0%95%EB%A6%AC (PKCE·nonce 는 빠져 있음 → 단계 4~6 에서 그 번호에 끼워 설명).
+  PKCE plain 질문(2-1) 복습은 단계 6 으로 미룸.
 - 2026-10-15: 로컬 IdP 포트를 **3011** 로 변경(.env 만, 운영은 3001 유지). `OIDC_ISSUER` 를 `http://localhost:3011/api/oidc` 로 수정.
+- 2026-10-19: discovery 가 401 → better-auth 전역 가드 때문. 라이브러리 `@AllowAnonymous()` 로 공개 처리하기로 함.
+  직접 만든 데코레이터는 better-auth 가드가 못 알아봐서 무의미 → Phase 2 에서 가드와 함께 직접 구현. §2 Phase 2 목록에 추가.
+- 2026-10-19: 단계 2 완료. 생각해볼 질문 Q1(single source of truth) ✅, Q2(iss 끝 `/`) △ — 결과를 "실패"로만 답하고 범위(전체 사용자)·이유(완전 일치 비교)는 빠짐. 상황 문제에 결과를 끝까지 안 쓰는 패턴 계속.
+- 2026-10-19: 단계 3 시작 전 확인 Q1 ✅ Q2 ❌("공개키를 개인키에 대입"). 개인키 = 도장 자체라 위조 서명이 가능하다는 점이 약함. 과제 문서 stages/stage-3-jwks.md 작성.
+  설명할 때 "위키"는 "정리 문서 N번(단계 이름)"으로 풀어 쓸 것(학습자가 '위키'가 뭔지 헷갈림).
 
 ## 9. 오답 노트 (복습용)
 
@@ -251,6 +265,24 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 | 0-9 | 2026-10-13 | (개념 질문) client 등록은 누가 하나 | "구글은 RP 를 미리 모르는데 어떻게 등록?" | ❌ | 등록은 **RP 쪽 개발자가 IdP 에 셀프로** 한다. 예: 구글 로그인을 붙이려는 개발자가 Google Cloud Console 에서 OAuth 클라이언트를 만들고 redirect URI 입력 → client_id/secret 받아 자기 .env 에. IdP 에 미리 등록 안 된 RP 는 로그인 요청 자체가 거부된다 | 2026-10-15 Q4 → △ 등록·.env ✅, 받는 것에 client_id 와 redirect_uri 등록 누락(secret 만 언급) |
 | 0-10 | 2026-10-13 | (복습 R6) RP 가 email 로 회원을 찾을 때, 탈퇴한 철수의 이메일로 영희가 재가입 후 로그인 | "아무 일도 없다. sub 기준이라서" | ❌ | 문제 전제가 **email 로 찾는 RP**. 영희가 로그인하면 RP 는 email 이 같으니 **철수의 RP 계정으로 로그인**시킨다 → 영희가 철수의 주문·주소·결제정보를 봄. 그래서 sub(+iss) 로 찾아야 한다. 문제 전제를 놓치고 정답 원칙만 답함 | 2026-10-15 Q6 → △ "sub 로 찾아야" 원칙만 답하고 두 경우 결과는 답 안 함(R6 과 같은 패턴). 정답: email → 못 찾아 새 회원 중복 생성·주문내역 잃음 / sub → 같은 철수, 이메일만 갱신 |
 | 0-11 | 2026-10-13 | (R5 후속) RP 세션 쿠키의 정체 | "IdP 가 발급한 id_token 을 Set-Cookie 하는 것?" | ❌ | 아니다. RP 가 **자기 손으로 만든 랜덤 세션 ID** 를 쿠키로 준다. RP DB 에 `세션ID → RP 회원 id` 로 저장. id_token 은 로그인 순간 검사에만 쓰고 쿠키에 넣지 않는다(놀이공원: 신분증은 돌려주고 손목밴드를 새로 채워줌) | 보충: 이건 교과서 방식. 아몬드영 admin-web 처럼 IdP 토큰(access/refresh/id)을 그대로 쿠키에 굽는 방식도 실무에 있음 → 둘 다 존재, 장단점 차이 / 2026-10-15 Q5 → △ RP 가 만듦 ✅, 그러나 "쿠키에서 sub 를 추출" → 쿠키엔 정보 없음. 세션 테이블에서 세션ID→회원 조회. 오개념 잔존 |
+
+### 단계 2 — Discovery
+
+| # | 날짜 | 질문 | 학습자 답 | 상태 | 핵심 포인트 (정답) | 복습 이력 |
+|---|---|---|---|---|---|---|
+| 2-1 | 2026-10-15 | PKCE `plain` 을 허용하면 authorize·callback URL 을 본 공격자가 얻는 것 | "거의 토큰을 얻은 것, IdP 정보를 얻은 것" / S256 이면 "해시가 안 맞음" | △ | plain 이면 URL 의 code_challenge 가 곧 **code_verifier** → callback 의 code 와 함께 /token 의 PKCE 검사 통과. (단 우리는 client_secret_basic 이라 secret 까지 있어야 토큰 획득 — PKCE 는 secret 이 없거나 샌 경우의 추가 방어선.) S256 이면 URL 엔 해시만 있고 해시는 되돌릴 수 없어 verifier 를 모름 → IdP 비교 실패. 흐름이 머리에 안 그려진다고 함 → 스무디 비유로 재설명 | |
+| 2-2 | 2026-10-15 | (위키 흐름 기준) 주소창에 보이는 번호 | "2번, 7번" | △ | 4번(authorize URL)·7번(callback URL). 2번은 RP 서버 안이라 아무도 못 봄 | |
+| 2-3 | 2026-10-15 | PKCE 비밀값 원본이 RP 밖으로 나가는 번호 | "9번" | ❌ | **8번**(RP→IdP /token, 서버끼리). 9번은 IdP→RP 응답 | |
+| 2-4 | 2026-10-15 | 6번에서 code 를 훔친 도둑이 /token 에 더 필요한 것 | "state 값" | ❌ | **client_secret + PKCE 비밀값(code_verifier)**. state 는 /token 에 안 보내고, 6번 URL 에 이미 보여서 비밀도 아님. state 는 7번에서 RP 가 쿠키와 비교하는 용도 | |
+| 2-5 | 2026-10-19 | 위키 8번 값 중 도둑이 모르는 것 | "client_secret, code_verifier" + "둘이 같은 말 아님?" | ✅ | 정답. 차이: secret=**RP 고정 비밀번호**(등록 때 1번 발급, 모든 로그인에 같은 값, "shop 이 보냈다" 증명) / verifier=**로그인 1번마다 새로 만드는 1회용**(2번에서 생성, "이 로그인을 시작한 쪽" 증명). secret 을 못 숨기는 앱(모바일·SPA)·secret 유출 시 PKCE 가 막아줌 | |
+| 2-6 | 2026-10-19 | id_token 의 iss 끝에 `/` 가 하나 더 붙으면 | "인식을 못하고 실패" | △ | RP 는 설정에 둔 issuer 와 iss 를 **완전 일치**로 비교(정규화 안 함) → 거절. 한 사람이 아니라 **모든 사용자 로그인이 실패**. 그래서 issuer 는 env 한 곳에서만 만들고 zod 로 끝 `/` 금지 | |
+
+### 단계 3 — 서명키 & JWKS
+
+| # | 날짜 | 질문 | 학습자 답 | 상태 | 핵심 포인트 (정답) | 복습 이력 |
+|---|---|---|---|---|---|---|
+| 3-1 | 2026-10-19 | 서명하는 키 / 확인하는 키 | "개인키, 공개키" | ✅ | IdP 가 개인키로 서명, RP 가 /jwks 의 공개키로 확인 | |
+| 3-2 | 2026-10-19 | /jwks 에 개인키가 새면 | "해커가 다른 사람의 공개키를 개인키에 대입시켜 로그인" | ❌ | 대입 같은 건 없다. 개인키를 가진 **누구나** 아무 `sub`(예: 철수)로 **가짜 id_token 을 직접 서명**해 만들 수 있고, RP 는 공개키로 확인해도 진짜와 구별 못 해 통과 → 우리 IdP 를 믿는 **모든 RP 에서 모든 사용자로** 로그인 가능. 대응: 즉시 새 키로 교체하고 샌 키를 /jwks 에서 제거 | |
 
 ## 10. 참고 스펙
 
