@@ -19,17 +19,17 @@ GET http://localhost:3011/api/oidc/jwks
 
 ## 준비
 
-- `jose` 는 이미 설치돼 있다 (`apps/auth/package.json`)
-- better-auth 도 `jwks` 라는 테이블을 쓰고 있다 (`src/database/schema/auth.ts`). **건드리지 말고** 우리 테이블은 이름을 다르게 (`oidc_signing_key`). 단계 10 에서 정리
+- `jose` 는 이미 설치돼 있다 (`apps/auth/package.json`). 단, 지금은 devDependencies 라 운영 이미지(`--prod`)에는 빠진다 → `dependencies` 로 옮길 것
+- better-auth 는 2026-10-19 에 전부 제거됨. `jwks` 이름이 비었으니 그대로 쓴다
 - 스키마는 `src/database/schema/` 에 새 파일(`oidc.ts`)로 두고 `index.ts` 에서 export. 마이그레이션은 `pnpm db:generate` → `pnpm db:migrate`
 
 ## 만들 것
 
-### ① 테이블 `oidc_signing_key`
-- [ ] `kid` (PK, 키 쌍의 이름표. 만들 때 한 번 정함 — 0-7 복습)
-- [ ] `public_jwk` (공개키, JWK JSON)
-- [ ] `private_jwk` (개인키, JWK JSON) — 지금은 평문 저장 OK, 아래 "도전 과제" 참고
-- [ ] `active` (지금 서명에 쓰는 키인지), `created_at`
+### ① 테이블 `jwks`
+- [x] `kid` (PK, 키 쌍의 이름표. 만들 때 한 번 정함 — 0-7 복습)
+- [x] `public_jwk` (공개키, JWK JSON)
+- [x] `private_jwk` (개인키, JWK JSON) — 지금은 평문 저장 OK, 아래 "도전 과제" 참고
+- [x] `active` (지금 서명에 쓰는 키인지), `created_at`
 
 ### ② 키 준비
 - [ ] 서버가 켜질 때 `active` 키가 없으면 RS256 키 쌍을 새로 만들어 저장
@@ -41,7 +41,7 @@ GET http://localhost:3011/api/oidc/jwks
 - [ ] 응답 모양: `{ "keys": [ ... ] }`
 - [ ] 각 키에 `kid`, `kty`, `alg: "RS256"`, `use: "sig"` 포함
 - [ ] **공개키만**. 개인키 전용 필드(`d`, `p`, `q`, `dp`, `dq`, `qi`)가 하나라도 있으면 안 된다
-- [ ] 로그인 없이 열려야 한다 (`@AllowAnonymous()`, 단계 2 처럼 메서드에)
+- [ ] 로그인 없이 열려야 한다 (지금은 전역 가드가 없어서 그냥 열린다)
 
 ## 힌트 (필요할 때만)
 
@@ -58,7 +58,6 @@ curl -s http://localhost:3011/api/oidc/jwks | jq
 2. `kid`, `kty: "RSA"`, `alg: "RS256"`, `use: "sig"`, `n`, `e` 가 있다
 3. `d` 가 **없다** (`curl ... | jq '.keys[].d'` 결과가 `null`)
 4. 서버를 껐다 켜도 `kid` 가 그대로다
-5. 기존 better-auth `/api/auth/jwks` 도 여전히 나온다
 
 ## 도전 과제 (선택)
 
@@ -78,4 +77,5 @@ curl -s http://localhost:3011/api/oidc/jwks | jq
 
 > 학습자가 "단계 3 다 했어"라고 하면 멘토가 여기에 날짜별로 지적·잘한 점·수정 여부를 기록한다.
 
-(아직 없음)
+- 2026-10-19 ① 테이블: `src/database/schema/oidc.ts` 의 `jwks` 확인, 체크 완료. kid PK·jsonb 저장 좋음.
+  참고: `active` 기본값이 `true` 라 키 교체 때 옛 키를 `false` 로 안 바꾸면 active 가 2개가 된다 → ② 에서 "active 하나만" 지키기

@@ -22,18 +22,20 @@
 ## 2. 범위
 
 ### Phase 1 — OIDC 제공자 직접 구현 (현재 목표)
-- 회원가입/로그인/세션/이메일 인증 등 **회원 기능은 better-auth 유지**
-- IdP 는 "지금 로그인한 사용자가 누구인가"만 better-auth 세션에서 얻는다
-- 그 외 OIDC 엔드포인트·토큰 발급·검증은 전부 직접 구현
-- better-auth 의 `jwt()`, `oauthProvider()` 플러그인은 직접 구현이 대체한 뒤 제거
+- OIDC 엔드포인트·토큰 발급·검증은 전부 직접 구현
+- ~~회원 기능은 better-auth 유지~~ → **2026-10-19 better-auth 전부 제거** (서버·web·DB 테이블). DB 에는 `user` 테이블만 남김
+- ⚠️ 단계 4(/authorize)는 "로그인한 사용자"가 필요하다 → 단계 4 전에 **최소 로그인/세션**을 직접 만든다 (Phase 2 를 그만큼 당겨옴)
 
-### Phase 2 — 회원/세션까지 직접 구현 (Phase 1 완료 후)
-- 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현 → better-auth 완전 제거
-- **better-auth 에 기대고 있어서 같이 직접 만들어야 하는 것** (Phase 1 진행 중 발견할 때마다 추가):
-  - [ ] 전역 인증 가드 (`@thallesp/nestjs-better-auth` 의 `AuthGuard`, 세션 없으면 401)
-  - [ ] `@AllowAnonymous()` 데코레이터 — 가드가 읽는 메타데이터와 짝이라 가드와 **같이** 만든다.
-        현재 사용처: `health.controller.ts`, `modules/oidc/controllers/oidc.controller.ts` (단계 2 discovery 공개용)
-- 세부 스펙은 Phase 1 끝난 뒤 작성
+### Phase 2 — 회원/세션까지 직접 구현
+- 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현
+- **better-auth 제거로 같이 사라져서 다시 만들어야 하는 것**:
+  - [ ] 로그인/세션 (단계 4 선행 조건). 기존 비밀번호 해시(`account` 테이블)는 버림 → 회원 다시 가입
+  - [ ] `user` 테이블 재설계 — 로그인 만들 때 같이 (비밀번호 해시 컬럼 추가, admin 플러그인 잔재 `role`/`banned`/`ban_reason`/`ban_expires` 정리). 단계 3 은 user 를 안 쓰므로 그 전엔 손대지 않음
+  - [ ] 전역 인증 가드 + `@AllowAnonymous()` (짝으로 같이). **지금은 가드가 없어서 모든 API 가 공개**
+  - [ ] web 화면: 로그인·회원가입·비밀번호 재설정·계정·동의 (git 히스토리 `9fd9858` 에 이전 UI 있음)
+  - [ ] 아바타 업로드 컨트롤러 (`AvatarsService` 는 남겨둠, 세션 생기면 컨트롤러만 복원)
+  - [ ] 이메일 인증/OTP (`lib/mailer.ts`, `packages/email` 은 남겨둠)
+  - [ ] RP 등록 스크립트 (`seed-oauth-client.ts` 삭제됨 → 단계 4 의 `oidc_client` 로 대체)
 
 ### 범위 밖 (YAGNI)
 - Implicit / Hybrid flow (보안상 비권장, 학습 가치 낮음)
@@ -53,7 +55,7 @@
 | 로그인/동의 UI | `apps/auth/web` (Next.js) | 기존 구조 |
 | RP | **이 레포에서 만들지 않음** (테스트 RP 포함). 실제 RP 는 별도 레포 → [rp-guide.md](rp-guide.md) | IdP 에만 집중 (2026-10-15 결정) |
 | IdP 테스트 방법 | 브라우저 주소창 + `curl` 로 직접 요청 | |
-| issuer (직접 구현) | `http://localhost:3011/api/oidc` | better-auth(`/api/auth`)와 겹치지 않게 공존. 단계 10 에서 정리 |
+| issuer (직접 구현) | `http://localhost:3011/api/oidc` | better-auth 제거 후에도 유지 |
 | DB | Postgres + Drizzle | 기존 구조 |
 | 브랜치 | `feature/oidc` 에서 학습용 브랜치 분기 | |
 
@@ -147,22 +149,21 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - [ ] RP-Initiated Logout (`end_session_endpoint`, `id_token_hint`, `post_logout_redirect_uri` 등록값 일치)
 - 스펙: RFC 6749 §6, RFC 9700(OAuth 2.0 Security BCP), OIDC RP-Initiated Logout 1.0
 
-### 단계 10 — better-auth OIDC 플러그인 제거
-- [ ] `jwt()`, `oauthProvider()` 제거, 관련 테이블 마이그레이션 정리
-- [ ] web 의 consent/services 화면을 새 API 로 연결
-- [ ] 기존 기능 회귀 확인
+### 단계 10 — better-auth 제거 ✅ (2026-10-19 앞당겨 완료)
+- [x] better-auth 전부 제거, 마이그레이션 `0006_remove_better_auth.sql` (user 외 테이블 DROP)
+- [ ] web 의 consent/services 화면을 새 API 로 연결 → Phase 2 목록으로 이동
 
 ## 6. 데이터 모델 (초안 — 단계 진행하며 학습자가 확정)
 
 | 테이블 | 핵심 컬럼 | 도입 단계 |
 |---|---|---|
-| `oidc_signing_key` | kid, public_jwk, private_jwk(암호화), created_at, active | 3 |
+| `jwks` | kid, public_jwk, private_jwk(암호화), created_at, active | 3 |
 | `oidc_client` | client_id, client_secret_hash, redirect_uris[], post_logout_redirect_uris[], name | 4 |
 | `oidc_authorization_code` | code_hash, client_id, user_id, redirect_uri, scope, nonce, code_challenge, expires_at, used_at | 4 |
 | `oidc_consent` | user_id, client_id, scopes[], created_at | 8 |
 | `oidc_refresh_token` | token_hash, family_id, client_id, user_id, scope, expires_at, revoked_at | 9 |
 
-기존 better-auth 의 `jwks`, `oauth_*` 테이블은 단계 10 에서 정리.
+better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
@@ -181,7 +182,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 | 7 userinfo | ⬜ |
 | 8 consent | ⬜ |
 | 9 refresh/logout | ⬜ |
-| 10 better-auth 제거 | ⬜ |
+| 10 better-auth 제거 | ✅ (2026-10-19, 앞당김) |
 
 ## 8. 학습 로그
 
@@ -244,6 +245,9 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - 2026-10-19: 단계 2 완료. 생각해볼 질문 Q1(single source of truth) ✅, Q2(iss 끝 `/`) △ — 결과를 "실패"로만 답하고 범위(전체 사용자)·이유(완전 일치 비교)는 빠짐. 상황 문제에 결과를 끝까지 안 쓰는 패턴 계속.
 - 2026-10-19: 단계 3 시작 전 확인 Q1 ✅ Q2 ❌("공개키를 개인키에 대입"). 개인키 = 도장 자체라 위조 서명이 가능하다는 점이 약함. 과제 문서 stages/stage-3-jwks.md 작성.
   설명할 때 "위키"는 "정리 문서 N번(단계 이름)"으로 풀어 쓸 것(학습자가 '위키'가 뭔지 헷갈림).
+- 2026-10-19: 학습자 결정 — 서명키 테이블을 `jwks` 로 쓰고 싶어서 **better-auth 전부 제거**. 로그인 불가 상태 감수. 단계 4 전에 최소 로그인/세션 직접 구현 필요.
+- 2026-10-19: 단계 3 ① 중 "`d` 가 /jwks 에 섞이면?" → "모르겠다". Q2(개인키 유출) 2회째 실패. 정리 문서 9·10번 기준으로 설명(누구나 id_token 위조 → 10번 검증 통과). 단계 3 완료 때 재확인.
+- 2026-10-19: 단계 3 ② 전 질문 "재시작마다 키 새로 만들면?" → "로그인한 사람 검증이 풀림 / 요청한 사람 검증 안 됨" △. 방향은 맞음. 교정: 이미 로그인한 RP 사용자는 RP 자체 세션(11번)이라 영향 없음. 깨지는 건 **재시작 전에 서명됐지만 아직 검증 전인 토큰**(9→10 사이 로그인, 나중에 검증하는 access_token, 로그아웃 id_token_hint). '누가' 범위를 정확히 짚는 연습 계속.
 
 ## 9. 오답 노트 (복습용)
 
@@ -283,6 +287,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 |---|---|---|---|---|---|---|
 | 3-1 | 2026-10-19 | 서명하는 키 / 확인하는 키 | "개인키, 공개키" | ✅ | IdP 가 개인키로 서명, RP 가 /jwks 의 공개키로 확인 | |
 | 3-2 | 2026-10-19 | /jwks 에 개인키가 새면 | "해커가 다른 사람의 공개키를 개인키에 대입시켜 로그인" | ❌ | 대입 같은 건 없다. 개인키를 가진 **누구나** 아무 `sub`(예: 철수)로 **가짜 id_token 을 직접 서명**해 만들 수 있고, RP 는 공개키로 확인해도 진짜와 구별 못 해 통과 → 우리 IdP 를 믿는 **모든 RP 에서 모든 사용자로** 로그인 가능. 대응: 즉시 새 키로 교체하고 샌 키를 /jwks 에서 제거 | |
+| 3-3 | 2026-10-19 | (개념 질문) id_token 이 jwks 의 개인키인가 | "id_token 이 jwks 의 개인키를 말하는 거 아니지?" | △ | 다르다. id_token = 개인키로 **도장 찍힌 증명서**(JWT: header.payload.signature, 로그인마다 새로 발급). 개인키 = **도장**(IdP DB 에만, 밖으로 안 나감). 연결 고리는 header 의 `kid` → /jwks 에서 같은 kid 의 공개키로 서명 확인 | |
 
 ## 10. 참고 스펙
 
