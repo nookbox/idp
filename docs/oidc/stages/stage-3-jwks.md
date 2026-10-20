@@ -32,8 +32,8 @@ GET http://localhost:3011/api/oidc/jwks
 - [x] `active` (지금 서명에 쓰는 키인지), `created_at`
 
 ### ② 키 준비
-- [ ] 서버가 켜질 때 `active` 키가 없으면 RS256 키 쌍을 새로 만들어 저장
-- [ ] 이미 있으면 새로 만들지 않는다 (재시작할 때마다 키가 바뀌면 이전에 발급한 토큰이 전부 검증 실패)
+- [x] 서버가 켜질 때 `active` 키가 없으면 RS256 키 쌍을 새로 만들어 저장
+- [x] 이미 있으면 새로 만들지 않는다 (재시작할 때마다 키가 바뀌면 이전에 발급한 토큰이 전부 검증 실패)
 - 쓸 함수: jose 의 `generateKeyPair('RS256', { extractable: true })`, `exportJWK()`
 - Nest 에서는 서비스의 `onModuleInit()` 이 "켜질 때 한 번" 실행되는 자리다
 
