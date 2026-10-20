@@ -1,8 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
 import { env } from '@/config/oidc-config';
+import { Controller, Get } from '@nestjs/common';
+import { OidcService } from '../services/oidc.service';
 
 @Controller('oidc')
 export class OidcController {
+  constructor(private readonly oidcService: OidcService) {}
   @Get('.well-known/openid-configuration')
   getOidc() {
     return {
@@ -18,5 +20,10 @@ export class OidcController {
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['client_secret_basic'],
     };
+  }
+
+  @Get('jwks')
+  getJwks() {
+    return this.oidcService.getPublicKeys();
   }
 }
