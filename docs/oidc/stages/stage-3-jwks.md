@@ -1,6 +1,6 @@
 # 단계 3: 서명키 만들기 & `GET /jwks`
 
-> 시작: 2026-10-19 · 상태: ⏳ 진행 중
+> 시작: 2026-10-19 · 상태: ✅ 완료 (2026-10-20)
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 3 구현 과제와 리뷰 기록만 담는다.
 
 ## 무엇을 만드나
@@ -38,10 +38,10 @@ GET http://localhost:3011/api/oidc/jwks
 - Nest 에서는 서비스의 `onModuleInit()` 이 "켜질 때 한 번" 실행되는 자리다
 
 ### ③ `GET /api/oidc/jwks`
-- [ ] 응답 모양: `{ "keys": [ ... ] }`
-- [ ] 각 키에 `kid`, `kty`, `alg: "RS256"`, `use: "sig"` 포함
-- [ ] **공개키만**. 개인키 전용 필드(`d`, `p`, `q`, `dp`, `dq`, `qi`)가 하나라도 있으면 안 된다
-- [ ] 로그인 없이 열려야 한다 (지금은 전역 가드가 없어서 그냥 열린다)
+- [x] 응답 모양: `{ "keys": [ ... ] }`
+- [x] 각 키에 `kid`, `kty`, `alg: "RS256"`, `use: "sig"` 포함
+- [x] **공개키만**. 개인키 전용 필드(`d`, `p`, `q`, `dp`, `dq`, `qi`)가 하나라도 있으면 안 된다
+- [x] 로그인 없이 열려야 한다 (지금은 전역 가드가 없어서 그냥 열린다)
 
 ## 힌트 (필요할 때만)
 
@@ -79,3 +79,8 @@ curl -s http://localhost:3011/api/oidc/jwks | jq
 
 - 2026-10-19 ① 테이블: `src/database/schema/oidc.ts` 의 `jwks` 확인, 체크 완료. kid PK·jsonb 저장 좋음.
   참고: `active` 기본값이 `true` 라 키 교체 때 옛 키를 `false` 로 안 바꾸면 active 가 2개가 된다 → ② 에서 "active 하나만" 지키기
+- 2026-10-20 ③ /jwks: 처음엔 배열 그대로 응답 → `{ keys }` 로 감싸서 통과. `kid`·`publicJwk` 만 select 해서 개인키를 아예 안 꺼냄(좋음). 옛 키 포함(where 없음).
+  학습자가 콘솔에 찍은 개인키를 대화에 붙여 넣음 → 로그 제거, 키 교체.
+- 2026-10-20 도전 과제 완료: `private_jwk` 를 jose `CompactEncrypt`(dir + A256GCM) JWE 문자열로 저장, 컬럼 `text`(0008).
+  `JWKS_ENCRYPTION_KEY` zod 로 base64 32바이트 검증. `process.env!` → `env` 로 교정. 복호화 후 `n` 이 공개키와 일치 확인.
+  `active` 기본값 false 로 바뀌어 insert 에 `active: true` 명시. 키 교체 구현은 Phase 2 "OIDC 운영 기능"으로.
