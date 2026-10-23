@@ -160,7 +160,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 | 테이블 | 핵심 컬럼 | 도입 단계 |
 |---|---|---|
 | `jwks` | kid, public_jwk, private_jwk(암호화), created_at, active | 3 |
-| `oidc_client` | client_id, client_secret_hash, redirect_uris[], post_logout_redirect_uris[], name | 4 |
+| `oidc_clients` | client_id, client_secret_hash, redirect_uris[], post_logout_redirect_uris[], name | 4 |
 | `oidc_authorization_code` | code_hash, client_id, user_id, redirect_uri, scope, nonce, code_challenge, expires_at, used_at | 4 |
 | `oidc_consent` | user_id, client_id, scopes[], created_at | 8 |
 | `oidc_refresh_token` | token_hash, family_id, client_id, user_id, scope, expires_at, revoked_at | 9 |
@@ -169,7 +169,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 3 완료** → 다음 단계 4 authorize (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 4 authorize — ①② 완료** → 다음 ③ 개발용 로그인 (할 일: [stage-4 "다음 작업"](stages/stage-4-authorize.md)) (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -252,6 +252,9 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-10-19: 단계 3 ② 전 질문 "재시작마다 키 새로 만들면?" → "로그인한 사람 검증이 풀림 / 요청한 사람 검증 안 됨" △. 방향은 맞음. 교정: 이미 로그인한 RP 사용자는 RP 자체 세션(11번)이라 영향 없음. 깨지는 건 **재시작 전에 서명됐지만 아직 검증 전인 토큰**(9→10 사이 로그인, 나중에 검증하는 access_token, 로그아웃 id_token_hint). '누가' 범위를 정확히 짚는 연습 계속.
 - 2026-10-20: 단계 3 ③ `/jwks` 완료(`{ keys }`, 공개키 6필드만). 학습자가 대화에 개인키를 붙여 넣어 → 로컬 DB 행 삭제 후 새 키로 교체. 학습자 결정 — **개인키 DB 암호화를 단계 3 에서 바로 한다**(미루지 않음).
   주의: schema 의 `active` 기본값은 `false`, 0007 마이그레이션은 `true` → 다음 `db:generate` 때 기본값이 바뀌면 insert 한 새 키가 비활성이 되어 재시작마다 키가 또 생김. insert 에서 `active: true` 를 명시하기로.
+- 2026-10-23: 단계 4 ② 완료. 학습자 결정 — 서비스에서 Reader(조회)/Manager(CUD) 분리, 이번엔 Reader 만(Manager 는 ④ code 저장 때). 로거: 요청 흐름은 `AppLogger`+ctx, `onModuleInit` 은 요청이 없어 Nest 기본 `Logger`.
+  1단계(throw)/2단계(302) 구분은 "redirect_uri 를 믿을 수 있나"로 이해. 질문: scope 의미, code_challenge_method, state 를 IdP 가 저장하나 → 검사는 안 하지만 정상 흐름에선 ③ 로그인 동안 **들고 가야** 한다고 설명.
+  답이 길면 따라오기 어려워함 → **할 일은 짧은 번호 목록으로**.
 
 ## 9. 오답 노트 (복습용)
 
@@ -303,6 +306,12 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 4-1 | 2026-10-20 | redirect_uri 를 prefix 로만 비교하면 (`callback.evil.com`, `callback/../steal`) | "csrf 공격이 위험함" | ❌ | CSRF 아님(그건 state 가 막는 것). 7번 302 가 **code 를 공격자 주소로 배달** → 공격자가 피해자의 code 를 손에 넣음 = authorization code 유출. 이걸로 피해자 계정으로 로그인 시도(code 주입). PKCE·client_secret 이 2차로 막아도 1차 방어선은 **정확히 일치** | |
 | 4-2 | 2026-10-20 | client_id 가 틀리면 왜 redirect 안 하고 IdP 화면에 에러? | "잘 모르겠음" | ❌ | client_id 를 모르면 그 redirect_uri 가 **등록된 값인지 확인할 방법이 없음** → 그대로 보내면 open redirect. 공격자가 `idp.com/authorize?client_id=가짜&redirect_uri=피싱사이트` 링크를 뿌리면 사용자는 믿을 만한 IdP 주소를 눌렀는데 피싱 사이트로 튕겨 감. 확인 안 된 주소로는 절대 보내지 않는다 | |
 | 4-3 | 2026-10-20 | (개념 질문) code 가 client_id 인가 | "code 는 client_id 를 말하는 건가" | ❌ | 다르다. client_id = **RP 의 이름표**(등록 때 1번, 공개, 모든 로그인에 같은 값, 4번 URL 에 RP 가 실어 보냄). code = **IdP 가 로그인 1번마다 새로 만드는 1회용 교환권**(랜덤, 1분 만료, 7번 URL 로 IdP 가 돌려줌, 8번에서 토큰으로 바꾸면 끝). 8번에 둘이 같이 가서 "이 code 가 이 client 에게 발급된 게 맞나"를 대조 | |
+| 4-4 | 2026-10-21 | client_secret 은 왜 암호화가 아니라 해시? | "secret 은 RP 의 code 랑 매칭하는 것. 그래서 해시만 있어도 충분" | △ | 결론(해시면 충분)은 맞음, 역할이 틀림. secret 은 code 와 매칭하는 값이 아니라 **RP 의 비밀번호**("내가 진짜 shop") — code↔RP 대조는 code 에 묶어 둔 `client_id` 로 함. IdP 는 받은 secret 을 해시해서 저장된 해시와 **같은지만** 보면 됨 → 원문 불필요 → 되돌릴 수 없는 해시. 개인키는 서명할 때 **원문이 필요** → 되돌릴 수 있는 암호화 | 2026-10-21 이어서 "secret 은 RP·IdP 둘 다 env 에 두는 것 아님?" → 흐름이 안 그려짐. 등록(0번) 때 IdP 가 생성 → RP 는 **원문을 env** 에, IdP 는 **해시를 DB `oidc_client`** 에(RP 가 여러 개라 env 불가) → 8번에 RP 가 원문 전송, IdP 가 해시해서 비교. 시퀀스로 설명 → 이어서 "oidc_client 가 털려도 해시라 괜찮다, 원문은 RP 만 안다" ✅ 스스로 정리 |
+| 4-5 | 2026-10-21 | (개념 질문) secret 은 노출돼도 상관없나 | "어떤 RP 인지 비교만 하니까 노출돼도 상관없고, 개인정보 위험이 없어서 해시로 한다" | ❌ | 반대. 노출되면 **위험**하다 — secret 을 가진 사람은 8번에서 **shop 행세**를 할 수 있음(훔친 code + secret → 토큰 시도, PKCE 가 마지막 방어선). 해시로 저장하는 이유가 바로 "위험하니까": DB 가 털려도 원문이 없게. 노출되면 새 secret 발급·교체. 노출돼도 되는 건 `client_id` 쪽 | 2026-10-21 바로 재확인 "client_id 는 털려도 되고 secret 만 안 털리면 되나" → ✅ (아이디/비밀번호 구조) |
+| 4-6 | 2026-10-23 | redirect_uris 는 왜 배열? | "모르겠다" | ❌ | RP 하나가 callback 주소를 여러 개 가짐: 환경별(localhost·staging·운영), 도메인별(www·app), 앱(모바일 custom scheme). 배열이어도 비교는 **그중 하나와 정확히 일치**(4-1). "목록에 비슷한 게 있으면 통과"가 아님 | |
+| 4-7 | 2026-10-23 | seed 재실행 때 새 secret 을 출력하면 | "해시와 안 맞음, 복사하면 검증할 때 에러" | ✅ | 맞음. 정확히: **8번 `/token`** 에서 IdP 가 hash(받은 secret) ≠ 저장된 해시 → `invalid_client`(401). 4~7번(로그인·code 발급)은 다 성공하고 마지막에만 실패해서 원인 찾기 어려움 → 그래서 이미 있으면 secret 을 **출력하지 않는다** | |
+| 4-8 | 2026-10-23 | (학습자 제안) redirect_uri 를 `//` 제거 등 정규화한 뒤 비교 | "프론트가 준 값을 정규화해서 검사해야 할 것 같다" | ❌ | 4-1 과 충돌. 정규화는 통과 범위를 **넓히기만** 함(등록 안 한 문자열도 통과). IdP 정규화기와 브라우저의 URL 해석이 다르면 그 틈으로 code 가 딴 데로 감. 스펙(OIDC Core 3.1.2.1, RFC 9700)은 **단순 문자열 비교**. RP 가 다른 형태로 보내면 RP 버그 → 등록값을 고치지 IdP 가 맞춰주지 않음 | |
+| 4-9 | 2026-10-23 | (학습자 제안) 1단계 에러 메시지가 자세하면 해커에게 유리? | "client 없음 / redirect_uri 불일치를 나눠 보여주면 위험할 것 같다" | △ | 통일해도 OK 지만 이득은 작음: `client_id` 는 원래 공개값(4-5)이라 "있다/없다"를 알려줘도 잃는 게 거의 없음. 1단계의 진짜 보안 포인트는 메시지가 아니라 **redirect 하지 않는 것**(4-2). 자세한 원인은 서버 로그에 남기고 화면은 한 문장으로 — 이게 흔한 절충 | |
 
 ## 10. 참고 스펙
 
