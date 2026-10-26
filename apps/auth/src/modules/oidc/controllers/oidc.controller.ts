@@ -60,24 +60,34 @@ export class OidcController {
 
     //  검증된 redirect_uri 로 error 를 들려 RP 에 돌려보냄
     if (typeof result === 'string') {
-      const url = new URL(query.redirect_uri);
-      url.searchParams.set('error', result);
-      if (query.state) url.searchParams.set('state', query.state);
-
-      // 302 Location: http://localhost:4000/callback?error=invalid_scope&state=a1b2
-      return res.redirect(302, url.toString());
+      return this.redirectRP(res, query.redirect_uri, {
+        error: result,
+        state: query.state,
+      });
     }
 
     const currentUser = await this.currentUserReader.getCurrentUser(req);
 
     if (!currentUser) {
-      const url = new URL(query.redirect_uri);
-
-      url.searchParams.set('error', 'login_required');
-      if (query.state) url.searchParams.set('state', query.state);
-      return res.redirect(302, url.toString());
+      return this.redirectRP(res, query.redirect_uri, {
+        error: 'login_required',
+        state: query.state,
+      });
     }
 
     res.send(`ok ${currentUser.id}`);
+  }
+
+  private redirectRP(
+    res: Response,
+    redirectUri: string,
+    params: Record<string, string | undefined>,
+  ) {
+    const url = new URL(redirectUri);
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) url.searchParams.set(key, value);
+    }
+
+    return res.redirect(302, url.toString());
   }
 }
