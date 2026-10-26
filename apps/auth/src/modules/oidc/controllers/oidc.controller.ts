@@ -9,12 +9,16 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { OidcService } from '../services/oidc.service';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
+import { CurrentUserReader } from '../readers/current-user.reader';
+import { OidcService } from '../services/oidc.service';
 
 @Controller('oidc')
 export class OidcController {
-  constructor(private readonly oidcService: OidcService) {}
+  constructor(
+    private readonly oidcService: OidcService,
+    private readonly currentUserReader: CurrentUserReader,
+  ) {}
   @Get('.well-known/openid-configuration')
   getOidc() {
     return {
@@ -64,6 +68,16 @@ export class OidcController {
       return res.redirect(302, url.toString());
     }
 
-    res.send('ok');
+    const currentUser = await this.currentUserReader.getCurrentUser(req);
+
+    if (!currentUser) {
+      const url = new URL(query.redirect_uri);
+
+      url.searchParams.set('error', 'login_required');
+      if (query.state) url.searchParams.set('state', query.state);
+      return res.redirect(302, url.toString());
+    }
+
+    res.send(`ok ${currentUser.id}`);
   }
 }

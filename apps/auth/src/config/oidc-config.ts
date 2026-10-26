@@ -14,6 +14,8 @@ const schema = z.object({
       (s) => Buffer.from(s, 'base64').length === 32,
       'base64 32바이트여야 합니다 (openssl rand -base64 32)',
     ),
+
+  DEV_LOGIN_USER_ID: z.string().optional(), // 개발 환경에서 로그인할 사용자 ID
 });
 
 export const env = schema.parse(process.env);

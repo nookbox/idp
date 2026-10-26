@@ -30,6 +30,7 @@
 - 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현
 - **better-auth 제거로 같이 사라져서 다시 만들어야 하는 것**:
   - [ ] 로그인/세션 (~~단계 4 선행 조건~~ 2026-10-20 Phase 2 로 유지). 기존 비밀번호 해시(`account` 테이블)는 버림 → 회원 다시 가입
+    - 세션이 생기면 바꿀 곳 2개: `CurrentUserReader.getCurrentUser` 안, `/authorize` 미로그인 처리(지금 임시 `error=login_required` 302 → 로그인 화면 redirect 후 4번 복귀. `login_required` 는 `prompt=none` 전용으로 남김)
   - [ ] `user` 테이블 재설계 — 로그인 만들 때 같이 (비밀번호 해시 컬럼 추가, admin 플러그인 잔재 `role`/`banned`/`ban_reason`/`ban_expires` 정리). 단계 3 은 user 를 안 쓰므로 그 전엔 손대지 않음
   - [ ] 전역 인증 가드 + `@AllowAnonymous()` (짝으로 같이). **지금은 가드가 없어서 모든 API 가 공개**
   - [ ] web 화면: 로그인·회원가입·비밀번호 재설정·계정·동의 (git 히스토리 `9fd9858` 에 이전 UI 있음)
@@ -169,7 +170,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 4 authorize — ①② 완료** → 다음 ③ 개발용 로그인 (할 일: [stage-4 "다음 작업"](stages/stage-4-authorize.md)) (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 4 authorize — ①②③ 완료** → 다음 ④ code 테이블+발급 (할 일: [stage-4 "다음 작업"](stages/stage-4-authorize.md)) (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -255,6 +256,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-10-23: 단계 4 ② 완료. 학습자 결정 — 서비스에서 Reader(조회)/Manager(CUD) 분리, 이번엔 Reader 만(Manager 는 ④ code 저장 때). 로거: 요청 흐름은 `AppLogger`+ctx, `onModuleInit` 은 요청이 없어 Nest 기본 `Logger`.
   1단계(throw)/2단계(302) 구분은 "redirect_uri 를 믿을 수 있나"로 이해. 질문: scope 의미, code_challenge_method, state 를 IdP 가 저장하나 → 검사는 안 하지만 정상 흐름에선 ③ 로그인 동안 **들고 가야** 한다고 설명.
   답이 길면 따라오기 어려워함 → **할 일은 짧은 번호 목록으로**.
+- 2026-10-26: 테스트 RP 재검토 → 다시 안 만들기로. 단계 4 는 curl, **단계 5 부터 흐름 검증은 e2e 테스트(supertest)** 로(verifier 생성→authorize→code→token 자동화). 로그인은 env `DEV_LOGIN_USER_ID` 로 테스트에서 조절. 테스트 RP 코드는 git 기록·rp-guide.md 에 남아 있음.
 
 ## 9. 오답 노트 (복습용)
 
@@ -313,6 +315,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 4-8 | 2026-10-23 | (학습자 제안) redirect_uri 를 `//` 제거 등 정규화한 뒤 비교 | "프론트가 준 값을 정규화해서 검사해야 할 것 같다" | ❌ | 4-1 과 충돌. 정규화는 통과 범위를 **넓히기만** 함(등록 안 한 문자열도 통과). IdP 정규화기와 브라우저의 URL 해석이 다르면 그 틈으로 code 가 딴 데로 감. 스펙(OIDC Core 3.1.2.1, RFC 9700)은 **단순 문자열 비교**. RP 가 다른 형태로 보내면 RP 버그 → 등록값을 고치지 IdP 가 맞춰주지 않음 | |
 | 4-9 | 2026-10-23 | (학습자 제안) 1단계 에러 메시지가 자세하면 해커에게 유리? | "client 없음 / redirect_uri 불일치를 나눠 보여주면 위험할 것 같다" | △ | 통일해도 OK 지만 이득은 작음: `client_id` 는 원래 공개값(4-5)이라 "있다/없다"를 알려줘도 잃는 게 거의 없음. 1단계의 진짜 보안 포인트는 메시지가 아니라 **redirect 하지 않는 것**(4-2). 자세한 원인은 서버 로그에 남기고 화면은 한 문장으로 — 이게 흔한 절충 | |
 | 4-10 | 2026-10-26 | (개념 질문) nonce 가 뭐야 | "nonce 가 뭐야?" | ❌ | 로그인 1번마다 RP 가 만드는 랜덤값. 2번 생성·쿠키 저장 → 4번 /authorize 로 전송 → IdP 가 code 에 묶어 저장(④) → 9번 id_token 안에 그대로 넣음 → 10번 RP 가 쿠키값과 비교. 막는 것: **다른 로그인의 id_token 을 끼워 넣기(재사용)**. state = 7번 callback(URL) 보호, nonce = 10번 id_token 보호 | 2026-10-26 이어서 "nonce 는 서버 간 통신?" → 아님. 갈 때 4번 **브라우저 URL**(front), 올 때 9번 **id_token 안**(back). 비밀값 아님 — 알아도 id_token 을 위조 못 함(서명은 IdP 개인키) |
+| 4-11 | 2026-10-26 | env 의 dev-user 가 DB 에서 지워졌는데 getCurrentUser 가 env 만 보고 돌려주면 | "없는 사용자라 에러" | △ | 에러는 **FK 가 있을 때만**: ④ code insert 가 FK 위반 → 500. FK 가 없으면 더 나쁨 — **조용히 성공**해서 없는 사용자로 code 발급 → 단계 5 id_token `sub=dev-user` 서명 → RP 는 유령 사용자로 로그인. 대응 ① getCurrentUser 가 DB 조회, 없으면 null(=미로그인) ② ④ 테이블 user_id 에 FK | |
 
 ## 10. 참고 스펙
 

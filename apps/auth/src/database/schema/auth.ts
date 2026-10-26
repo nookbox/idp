@@ -1,4 +1,5 @@
 import { boolean, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { InferSelectModel } from 'drizzle-orm';
 import { timestamps } from './timestamps';
 
 export const user = pgTable('user', {
@@ -16,3 +17,5 @@ export const user = pgTable('user', {
   banExpires: timestamp('ban_expires'),
   ...timestamps,
 });
+
+export type User = InferSelectModel<typeof user>;

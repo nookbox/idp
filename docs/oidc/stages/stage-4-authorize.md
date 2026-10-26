@@ -55,8 +55,9 @@
 5. 정상 통과 시 지금의 `res.send('ok')` 를 `302 redirect_uri?code=...&state=...` 로 교체
 
 ### ③ 로그인 확인 (개발용 대신하기)
-- [ ] 개발용 사용자 1명을 `user` 테이블에 넣는다
-- [ ] "지금 로그인한 사람"을 돌려주는 함수 하나를 만들고, 지금은 그 개발용 사용자를 돌려준다
+- [x] 개발용 사용자 1명을 `user` 테이블에 넣는다 (`scripts/seed-dev-user.ts`, env `DEV_LOGIN_USER_ID`)
+- [x] "지금 로그인한 사람"을 돌려주는 함수 하나를 만들고, 지금은 그 개발용 사용자를 돌려준다 (`CurrentUserReader.getCurrentUser`, DB 에 없으면 null)
+- [x] 미로그인(null) → **임시로** `302 redirect_uri?error=login_required&state=...` (2026-10-26 학습자 결정). 원래 `login_required` 는 RP 가 `prompt=none` 일 때 쓰는 코드라 Phase 2 에서 "로그인 화면으로 보냈다가 4번으로 복귀"로 교체
 - Phase 2 에서 진짜 세션이 생기면 **이 함수 안만** 바꾸면 되게 한 곳에 모은다
 - 어떻게 대신할지(env 에 user id, 코드에 고정 등)는 시작할 때 멘토와 정한다
 
