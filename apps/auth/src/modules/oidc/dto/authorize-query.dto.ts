@@ -26,4 +26,8 @@ export class AuthorizeQueryDto {
   @IsOptional()
   @IsString()
   code_challenge_method?: string;
+
+  @IsOptional()
+  @IsString()
+  nonce?: string;
 }

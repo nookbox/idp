@@ -92,7 +92,7 @@ export class OidcService implements OnModuleInit {
       return 'client_Unregistered';
     }
 
-    if (RPClient.redirectUris && !RPClient.redirectUris.includes(redirectUri)) {
+    if (!RPClient.redirectUris.includes(redirectUri)) {
       this.appLogger.warn(ctx, '등록되지 않은 redirect_uri', {
         clientId,
         redirectUri,

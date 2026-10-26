@@ -103,3 +103,6 @@
   지적·교정: client 를 `name` 으로 조회 → `client_id` / Reader 에 `@Injectable`·`@Inject(DATABASE)`·providers 등록 누락 / `return new NotFoundException` → throw / DB row(`client_secret_hash` 포함) 를 응답으로 반환 → `'ok'` / response_type 을 DB 컬럼으로 검사 → 요청값 `=== 'code'` / `responseType &&` 가드 때문에 값 없으면 통과 / 문자열 `.includes('code')` 부분 일치 / 2단계도 throw 하려 함 → 302.
   학습자 제안: redirect_uri 정규화(4-8 ❌), 에러 메시지 통일(4-9 △).
   curl 확인: 없는 client 400, evil redirect 400, response_type·scope·plain 각각 302+error+state, state 없으면 error 만, 정상 200 `ok`.
+- 2026-10-26 ② 재점검(멘토): ① `nonce` 를 붙이면 400 `property nonce should not exist` — 전역 ValidationPipe `forbidNonWhitelisted` 때문. DTO 에 nonce 없음(④ 에서 저장해야 함). RFC 6749 §3.1 은 모르는 파라미터를 **무시**하라고 함 → 이 엔드포인트만 처리 방법 정해야 함.
+  ② `RPClient.redirectUris && !includes(...)` — 값이 없으면 검사를 건너뛰는(fail-open) 가드. 지금은 컬럼이 notNull 이라 무해하지만 앞서 교정한 `responseType &&` 와 같은 패턴 → 제거.
+  → 2026-10-26 수정 완료: `forbidNonWhitelisted: false`(whitelist 는 유지, 다른 @Body/@Query 엔드포인트 없음 확인), DTO 에 `nonce`, `redirectUris &&` 제거. curl: nonce·prompt 붙여도 ok, evil redirect 400, scope 없음 302 유지.

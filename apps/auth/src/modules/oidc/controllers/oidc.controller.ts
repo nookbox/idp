@@ -46,7 +46,7 @@ export class OidcController {
     const ctx = createRequestContext(req);
     const result = await this.oidcService.authorize(ctx, query);
 
-    // redirect_uri 를 아직 못 믿으니 IdP 가 직접 응답 (4-2)
+    // redirect_uri 를 아직 못 믿으니 IdP 가 직접 응답
     if (result === 'client_Unregistered') {
       throw new BadRequestException('OIDC 클라이언트를 찾을 수 없습니다.');
     }
