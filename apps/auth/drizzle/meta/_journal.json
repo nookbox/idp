@@ -71,6 +71,13 @@
       "when": 1792718800370,
       "tag": "0009_rich_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793338798601,
+      "tag": "0010_happy_charles_xavier",
+      "breakpoints": true
     }
   ]
 }
