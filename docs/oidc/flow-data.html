@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OIDC 로그인 흐름: 실제 주고받는 데이터</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #24231f; --muted: #6b695f; --line: #dcd9cf; --code-bg: #f3f1ea;
+    --front: #b45f06; --front-bg: #fdf0df; --back: #0f766e; --back-bg: #dff4f1; --inner: #55534a; --inner-bg: #ecebe4;
+    --state: #1d5fbf; --nonce: #7b3fb3; --pkce: #b3261e; --code: #1a7f37; --danger: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191917; --panel: #24241f; --ink: #ecebe4; --muted: #a3a195; --line: #3c3b34; --code-bg: #1c1c18;
+      --front: #f0a44b; --front-bg: #3d2b14; --back: #4fd1c5; --back-bg: #12332f; --inner: #c4c2b6; --inner-bg: #33322c;
+      --state: #7db2ff; --nonce: #c79bf2; --pkce: #ff8f85; --code: #6fdc8c; --danger: #ff8f85;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.65;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 28px; line-height: 1.3; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 56px 0 12px; }
+  p { margin: 8px 0; }
+  .lead { color: var(--muted); }
+  pre, code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: .92em; }
+  pre { margin: 0; background: var(--code-bg); padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-all; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 14px 0; }
+  .box h3 { margin: 0 0 8px; font-size: 16px; }
+  .small { font-size: 14px; color: var(--muted); }
+
+  .v { font-style: normal; font-weight: 700; transition: opacity .15s; }
+  .v.state { color: var(--state); } .v.nonce { color: var(--nonce); }
+  .v.pkce { color: var(--pkce); } .v.code { color: var(--code); }
+
+  .picker { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .picker button { font: inherit; font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  .picker button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; margin: 12px 0 4px; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+  .tag.front { color: var(--front); background: var(--front-bg); }
+  .tag.back { color: var(--back); background: var(--back-bg); }
+  .tag.inner { color: var(--inner); background: var(--inner-bg); }
+
+  body[data-focus] .v { opacity: .22; }
+  body[data-focus="state"] .v.state, body[data-focus="nonce"] .v.nonce,
+  body[data-focus="pkce"] .v.pkce, body[data-focus="code"] .v.code { opacity: 1; }
+  .step.dim { opacity: .3; }
+
+  .flow { position: relative; margin-top: 8px; }
+  .lanes { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .lanes small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .lane-line { position: absolute; top: 48px; bottom: 0; width: 1px; background: var(--line); }
+  .l1 { left: 16.66%; } .l2 { left: 50%; } .l3 { left: 83.33%; }
+  .step { position: relative; transition: opacity .15s; padding-bottom: 6px; }
+  .track { position: relative; height: 48px; }
+  .arrow { position: absolute; bottom: 10px; height: 0; border-top: 2px solid var(--front); }
+  .arrow.back { border-top: 3px solid var(--back); }
+  .arrow::after { content: ""; position: absolute; top: -7px; border: 6px solid transparent; }
+  .arrow.right::after { right: -1px; border-left: 10px solid var(--front); border-right: 0; }
+  .arrow.left::after { left: -1px; border-right: 10px solid var(--front); border-left: 0; }
+  .arrow.back.right::after { border-left-color: var(--back); }
+  .arrow.back.left::after { border-right-color: var(--back); }
+  .arrow span { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); font-size: 12px; font-weight: 600;
+    white-space: nowrap; background: var(--bg); padding: 0 6px; }
+  .rp-br { left: 16.66%; right: 50%; } .br-idp { left: 50%; right: 16.67%; } .rp-idp { left: 16.66%; right: 16.67%; }
+  .self { position: absolute; bottom: 4px; transform: translateX(-50%); font-size: 12px; font-weight: 600; white-space: nowrap;
+    background: var(--inner-bg); color: var(--inner); border-radius: 6px; padding: 2px 10px; }
+  .card { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .card-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 700; font-size: 15px; }
+  .num { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 13px;
+    background: var(--ink); color: var(--bg); font-size: 13px; }
+  .note { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+
+  .trace { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; margin: 10px 0; }
+  .trace div { flex: 1 1 120px; background: var(--code-bg); border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.45; }
+  .trace b { display: block; font-size: 12px; color: var(--muted); }
+  .trace .hot { outline: 2px solid var(--front); }
+  .trace .miss { outline: 2px dashed var(--line); color: var(--muted); }
+  .answer { margin-top: 10px; font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; color: var(--muted); }
+  .bad { color: var(--danger); font-weight: 700; }
+  @media (max-width: 620px) {
+    .arrow span, .self { font-size: 11px; white-space: normal; width: max-content; max-width: 52vw; text-align: center; }
+    .track { height: 56px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>OIDC 로그인 흐름: 실제 주고받는 데이터</h1>
+  <p class="lead">누가 누구에게 어떤 모양으로 보내는지 1번부터 10번까지 따라갑니다. 값은 <code>shop</code> RP와 이 레포의 IdP를 기준으로 한 예시입니다.</p>
+
+  <h2>먼저, Referer가 뭐야?</h2>
+  <div class="box">
+    <p><b>브라우저가 "나 이 페이지에서 왔어"라고 다음 서버에 알려 주는 요청 헤더</b>입니다. 철자는 원래 표준에 오타가 난 그대로 굳어서 r이 하나입니다.</p>
+    <pre>사용자가 blog.com 글에서 shop.com 링크를 클릭하면
+
+GET / HTTP/1.1
+Host: shop.com
+Referer: https://blog.com/post/1     ← 브라우저가 자동으로 붙임</pre>
+    <p style="margin-top:12px"><b>code와 무슨 상관?</b> 7번이 끝나면 브라우저는 <code>/callback?<i class="v code">code=Xy7...</i></code> 주소에 있습니다. 이 페이지가 외부 이미지를 불러오거나 외부 링크로 나가면, 그 외부 서버에 주소가 전달될 수 있습니다.</p>
+    <pre>GET /ad.png HTTP/1.1
+Host: ads.example
+Referer: http://localhost:4000/callback?<i class="v code">code=Xy7...</i>&amp;<i class="v state">state=st123</i>     ← 위험한 경우</pre>
+    <p class="note">요즘 브라우저는 기본값(<code>strict-origin-when-cross-origin</code>)으로 다른 사이트에 <code>http://localhost:4000/</code>까지만 보냅니다. 그래서 위 경우는 사이트가 정책을 느슨하게 풀었거나 오래된 브라우저일 때 생깁니다. 제가 앞에서 "Referer에 남을 수 있다"고 한 건 기본 동작이 아니라 이런 예외입니다. code가 URL에 실리는 이상 방문 기록, 서버 로그 같은 다른 노출 경로도 있어서 만료를 짧게 둡니다.</p>
+  </div>
+
+  <h2>전체 흐름</h2>
+  <div class="legend">
+    <span><span class="tag front">주소가 보임</span> 브라우저를 거침 (주소창·방문 기록·로그)</span>
+    <span><span class="tag back">서버끼리</span> 브라우저를 거치지 않음</span>
+    <span><span class="tag inner">내부 처리</span> 네트워크로 안 나감</span>
+  </div>
+  <p class="small">8~10번은 단계 5 이후에 만들 부분이라, SPEC 기준의 예정 모양입니다. RP(1~3, 7, 10번의 RP 쪽 처리)는 이 레포 범위 밖입니다.</p>
+
+  <div class="picker" role="group" aria-label="값 따라가기">
+    <span class="small">값 따라가기:</span>
+    <button data-f="">전체</button>
+    <button data-f="state"><i class="v state">state</i> (짝꿍 쪽지)</button>
+    <button data-f="nonce"><i class="v nonce">nonce</i></button>
+    <button data-f="pkce"><i class="v pkce">PKCE</i></button>
+    <button data-f="code"><i class="v code">code</i> (번호표)</button>
+  </div>
+
+  <div class="flow">
+    <div class="lane-line l1"></div><div class="lane-line l2"></div><div class="lane-line l3"></div>
+    <div class="lanes">
+      <div>RP 서버<small>shop · :4000</small></div>
+      <div>브라우저<small>사용자</small></div>
+      <div>IdP<small>우리 서버 · :3011</small></div>
+    </div>
+
+    <article class="step">
+      <div class="track"><div class="arrow left rp-br"><span>로그인 클릭</span></div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">1</span> 브라우저 → RP</div>
+        <pre>GET /login HTTP/1.1
+Host: localhost:4000</pre>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="self" style="left:16.66%">값 만들기</div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">2</span> RP 안에서 <span class="tag inner">내부 처리</span></div>
+        <pre><i class="v state">state</i>         = st123
+<i class="v nonce">nonce</i>         = n456
+<i class="v pkce">code_verifier</i> = dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk   ← 비밀, 아직 아무에게도 안 보냄
+<i class="v pkce">code_challenge</i> = S256(code_verifier)
+              = E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM</pre>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="arrow right rp-br"><span>302 + 쿠키</span></div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">3</span> RP → 브라우저 <span class="tag front">주소가 보임</span></div>
+        <pre>HTTP/1.1 302 Found
+Set-Cookie: <i class="v state">state=st123</i>; <i class="v nonce">nonce=n456</i>; <i class="v pkce">verifier=dBjf...</i>   (예시, HttpOnly 쿠키)
+Location: http://localhost:3011/api/oidc/authorize?...   (4번 주소)</pre>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="arrow right br-idp"><span>GET /authorize</span></div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">4</span> 브라우저 → IdP <span class="tag front">주소가 보임</span></div>
+        <pre>GET /api/oidc/authorize
+  ?response_type=code
+  &amp;client_id=shop
+  &amp;redirect_uri=http://localhost:4000/callback
+  &amp;scope=openid profile email
+  &amp;<i class="v state">state=st123</i>
+  &amp;<i class="v nonce">nonce=n456</i>
+  &amp;<i class="v pkce">code_challenge=E9Melhoa...</i>     ← 해시만 나감. verifier는 안 나감
+  &amp;code_challenge_method=S256</pre>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="self" style="left:83.33%">code 발급·저장</div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">5~6</span> IdP 안에서 <span class="tag inner">내부 처리</span></div>
+        <p class="note" style="margin:0 0 8px">RP·파라미터·로그인을 확인한 뒤 code 원문을 만들고, DB에는 해시로 저장합니다.</p>
+        <pre>oidc_authorization_code 테이블의 한 행
+{
+  <i class="v code">code_hash</i>:      "sha256(<i class="v code">Xy7...</i>)",    ← 원문 아님
+  client_id:      "shop",
+  user_id:        "dev-user",
+  redirect_uri:   "http://localhost:4000/callback",
+  scope:          "openid profile email",
+  <i class="v nonce">nonce</i>:          "n456",
+  <i class="v pkce">code_challenge</i>: "E9Melhoa...",
+  auth_time:      "12:40:00",
+  expires_at:     "12:45:00",           ← 5분 뒤
+  used_at:        null
+}</pre>
+        <p class="note"><i class="v state">state</i>는 저장하지 않습니다. 받은 값을 7번 주소에 그대로 돌려주기만 합니다.</p>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="arrow left rp-idp"><span>302 → /callback (브라우저가 이어서 전달)</span></div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">7</span> IdP → 브라우저 → RP <span class="tag front">주소가 보임</span></div>
+        <pre>IdP의 응답
+HTTP/1.1 302 Found
+Location: http://localhost:4000/callback?<i class="v code">code=Xy7...</i>&amp;<i class="v state">state=st123</i>
+
+브라우저가 이어서 보내는 요청
+GET /callback?<i class="v code">code=Xy7...</i>&amp;<i class="v state">state=st123</i> HTTP/1.1
+Host: localhost:4000
+Cookie: <i class="v state">state=st123</i>; <i class="v nonce">nonce=n456</i>; <i class="v pkce">verifier=dBjf...</i></pre>
+        <p class="note"><b>code 원문이 URL에 실리는 구간입니다.</b> RP는 주소의 <i class="v state">state</i>와 쿠키의 <i class="v state">state</i>가 같은지 비교합니다.</p>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="arrow right back rp-idp"><span>POST /token</span></div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">8</span> RP → IdP <span class="tag back">서버끼리</span></div>
+        <pre>POST /api/oidc/token HTTP/1.1
+Authorization: Basic base64(shop:client_secret)      ← "나는 shop이다"
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&amp;<i class="v code">code=Xy7...</i>
+&amp;redirect_uri=http://localhost:4000/callback
+&amp;<i class="v pkce">code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk</i>      ← 비밀이 처음 밖으로 나감</pre>
+        <p class="note">여기에 <i class="v nonce">nonce</i>와 <i class="v state">state</i>는 없습니다. IdP의 확인 순서: 해시로 code 행 찾기 → 만료·1회용 확인 → 같은 client인지, 같은 redirect_uri인지 확인 → <code>S256(<i class="v pkce">verifier</i>) === 저장된 <i class="v pkce">code_challenge</i></code></p>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="arrow left back rp-idp"><span>토큰 응답 (JSON)</span></div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">9</span> IdP → RP <span class="tag back">서버끼리</span></div>
+        <pre>HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "id_token":     "eyJhbGci...헤더.페이로드.서명",   ← 신분증
+  "access_token": "...",                            ← 출입증
+  "token_type":   "Bearer",
+  "expires_in":   3600
+}
+
+id_token의 페이로드를 풀어 보면
+{
+  "iss":   "http://localhost:3011/api/oidc",
+  "aud":   "shop",
+  "sub":   "dev-user",
+  "<i class="v nonce">nonce</i>": "n456",                  ← 5~6번에서 저장한 값을 그대로 넣음
+  "iat":   1793420400,
+  "exp":   1793424000
+}</pre>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="track"><div class="self" style="left:16.66%">검증 후 로그인</div></div>
+      <div class="card">
+        <div class="card-h"><span class="num">10</span> RP 안에서 <span class="tag inner">내부 처리</span></div>
+        <pre>1. /jwks의 공개키로 id_token 서명 확인
+2. iss, aud, exp 확인
+3. id_token의 <i class="v nonce">nonce</i> === 쿠키의 <i class="v nonce">nonce</i>
+4. sub로 RP 자체 세션 생성 → 로그인 완료</pre>
+      </div>
+    </article>
+  </div>
+
+  <h2>아까 헷갈린 3가지</h2>
+
+  <div class="box">
+    <h3>1. <i class="v nonce">nonce</i>는 왜 code와 같이 저장할까?</h3>
+    <div class="trace">
+      <div><b>2번</b>RP가 만듦</div>
+      <div><b>4번</b>IdP가 받음</div>
+      <div class="hot"><b>5~6번</b>code 행에 저장</div>
+      <div class="miss"><b>8번</b>안 옴</div>
+      <div><b>9번</b>id_token에 넣음</div>
+      <div><b>10번</b>RP가 비교</div>
+    </div>
+    <p class="answer">8번에 nonce가 안 오기 때문에, 저장해 두지 않으면 9번에서 넣을 값이 없습니다.</p>
+  </div>
+
+  <div class="box">
+    <h3>2. <i class="v pkce">code_challenge</i>는 뭘 증명할까?</h3>
+    <table>
+      <tr><th>값</th><th>증명하는 것</th><th>수명</th></tr>
+      <tr><td><code>client_secret</code></td><td>"나는 shop이다" (RP 신원)</td><td>RP당 고정</td></tr>
+      <tr><td><i class="v pkce">code_verifier</i></td><td>"이번 로그인을 시작한 게 나다"</td><td>로그인 1번마다 새로</td></tr>
+    </table>
+    <p class="answer">code만 훔친 사람의 8번 요청은 이렇게 끝납니다.</p>
+    <pre>POST /token  <i class="v code">code=Xy7...</i>  (<i class="v pkce">code_verifier</i> 없음, 또는 틀린 값)
+→ S256(verifier) ≠ 저장된 code_challenge
+→ 400 {"error":"invalid_grant"}</pre>
+  </div>
+
+  <div class="box">
+    <h3>3. <i class="v code">code</i> 만료는 왜 짧게 할까?</h3>
+    <div class="trace">
+      <div><b>5~6번</b>IdP가 발급, DB엔 해시</div>
+      <div class="hot"><b>7번</b>URL에 원문 노출<br><span class="tag front">IdP → 브라우저 → RP</span></div>
+      <div><b>8번</b>IdP로 돌아감<br><span class="tag back">서버끼리</span></div>
+    </div>
+    <p class="answer">"URL에 담겨 IdP로 온다"가 아니라, URL에 실리는 건 <b>IdP에서 RP로 가는 7번</b>이고, IdP로 돌아오는 8번은 URL에 보이지 않습니다. 7번에서 샜을 때 쓸 수 있는 시간을 줄이려고 만료를 짧게 둡니다.</p>
+  </div>
+</main>
+<script>
+  const buttons = [...document.querySelectorAll('.picker button')];
+  const steps = [...document.querySelectorAll('.step')];
+  function focusValue(name) {
+    if (name) document.body.dataset.focus = name; else delete document.body.dataset.focus;
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === name)));
+    steps.forEach((s) => s.classList.toggle('dim', Boolean(name) && !s.querySelector('.v.' + name)));
+  }
+  buttons.forEach((b) => b.addEventListener('click', () => focusValue(b.dataset.f)));
+  focusValue('');
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # 단계 4: `GET /authorize` — code 발급
 
-> 시작: 2026-10-20 · 상태: ⏳ 진행 중
+> 시작: 2026-10-20 · 상태: ✅ 완료 (2026-10-31)
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 4 구현 과제와 리뷰 기록만 담는다.
 
 ## 무엇을 만드나
@@ -62,11 +62,11 @@
 - 어떻게 대신할지(env 에 user id, 코드에 고정 등)는 시작할 때 멘토와 정한다
 
 ### ④ 테이블 `oidc_authorization_code` + 발급
-- [ ] code 는 충분히 긴 랜덤 (32바이트 이상, base64url)
-- [ ] DB 에는 code **원문 말고 해시**를 저장 (`code_hash`). DB 가 새도 code 를 못 쓰게
-- [ ] 같이 묶어 저장: `client_id`, `user_id`, `redirect_uri`, `scope`, `nonce`, `code_challenge`, `auth_time`
-- [ ] `expires_at` = 지금 + 1분, `used_at` (단계 5 에서 1회용 처리에 씀)
-- [ ] 302 → `redirect_uri?code=원문&state=받은값`
+- [x] code 는 충분히 긴 랜덤 (32바이트 이상, base64url)
+- [x] DB 에는 code **원문 말고 해시**를 저장 (`code_hash`). DB 가 새도 code 를 못 쓰게
+- [x] 같이 묶어 저장: `client_id`, `user_id`, `redirect_uri`, `scope`, `nonce`, `code_challenge`, `auth_time`
+- [x] `expires_at` = 지금 + 5분 (2026-10-31 학습자 결정, 1분에서 변경), `used_at` (단계 5 에서 1회용 처리에 씀)
+- [x] 302 → `redirect_uri?code=원문&state=받은값`
 
 ## 힌트 (필요할 때만)
 
@@ -88,12 +88,12 @@
 ## 만들면서 생각해볼 질문
 
 - code 에 `nonce` 와 `code_challenge` 를 **왜** 같이 저장해 둘까? 각각 단계 5 의 몇 번에서 꺼내 쓰일까?
-- code 만료를 10분이 아니라 1분으로 짧게 잡는 이유는? 1분이면 정상 사용자에게 문제는 없을까?
+- code 만료를 10분이 아니라 5분으로 짧게 잡는 이유는? 5분이면 정상 사용자에게 문제는 없을까?
 
 > 내 답:
 >
-> -
-> -
+> - nonce 는 id_token 에 오는 값, 재사용 방지. code_challenge 는 이 RP 에서 요청 온 게 맞는지 보려고?
+> - 서버→서버 요청이 아니라 url 에 담겨서 idp 로 오기 때문에? 5분이어도 정상 사용자는 문제없을 것 같다.
 
 ## 리뷰 기록
 
@@ -107,3 +107,7 @@
 - 2026-10-26 ② 재점검(멘토): ① `nonce` 를 붙이면 400 `property nonce should not exist` — 전역 ValidationPipe `forbidNonWhitelisted` 때문. DTO 에 nonce 없음(④ 에서 저장해야 함). RFC 6749 §3.1 은 모르는 파라미터를 **무시**하라고 함 → 이 엔드포인트만 처리 방법 정해야 함.
   ② `RPClient.redirectUris && !includes(...)` — 값이 없으면 검사를 건너뛰는(fail-open) 가드. 지금은 컬럼이 notNull 이라 무해하지만 앞서 교정한 `responseType &&` 와 같은 패턴 → 제거.
   → 2026-10-26 수정 완료: `forbidNonWhitelisted: false`(whitelist 는 유지, 다른 @Body/@Query 엔드포인트 없음 확인), DTO 에 `nonce`, `redirectUris &&` 제거. curl: nonce·prompt 붙여도 ok, evil redirect 400, scope 없음 302 유지.
+- 2026-10-31 ④ 최종 리뷰(멘토). 완료 확인 6개 통과. 로그에 code 원문·code_hash 없음 확인.
+  잘한 점: 원문 대신 해시 저장, 48바이트 랜덤, `new URL` 로 조립, Service 가 DB row 대신 필요한 값만 반환(`client_secret_hash` 노출 제거), `DEV_LOGIN_USER_ID` 없으면 미로그인, FK 로 없는 사용자 발급 차단(4-11).
+  수정 필요: ① `code_challenge` 형식 미검증(`abc123` 통과) → 2단계 `invalid_request` 로. ② `docker-compose.prod.yml` 의 auth `environment` 에 `OIDC_ISSUER`·`JWKS_ENCRYPTION_KEY` 없음 → 이대로 배포하면 부팅 실패. `.env.prod.example` 에도 추가. ③ `schema/oidc.ts` 주석 `발급 시간 5분` → `발급 + 5분`.
+  다음 단계 메모: `scope` 를 그대로 저장해 `openid admin` 도 통과(단계 5·7 에서 `scopes_supported` 밖은 쓰지 않기), 만료 code 정리 작업 없음 + FK `no action` 이라 code 가 남은 사용자는 삭제 불가, `DEV_LOGIN_USER_ID` 는 운영 차단 장치가 없음(지금은 compose 가 안 넘겨서 안전). 수정 여부: ① 멘토 수정(학습자 요청, 길이 검사를 실패 블록 안에 넣어 실행되지 않던 것을 조건으로 올리고 `/^[A-Za-z0-9_-]{43}$/` 로 검사. curl: 정상 43자만 code, 잘못된 값 8종 모두 `invalid_request`), ③ 학습자 수정 완료, ② compose·`.env.prod.example` 멘토 수정(`OIDC_ISSUER` 는 `${PUBLIC_ORIGIN}/api/oidc` 로 조립, `/api/*` 는 기존 터널 규칙으로 auth 도달 확인), 실제 `.env.prod` 의 `JWKS_ENCRYPTION_KEY` 는 학습자가 추가(32바이트 확인). 학습자가 넣은 2단계 `invalid_request` throw 는 302 규칙 위반이라 설명 후 학습자가 제거.

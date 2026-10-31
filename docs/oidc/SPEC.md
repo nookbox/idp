@@ -13,6 +13,7 @@
   4. 막히면 힌트를 단계적으로(개념 → 방향 → 의사코드 → 코드). 코드는 최후 수단
 - 단계 시작 전 확인 질문으로 이해도 점검 → 설명 깊이 조절
 - 진행할 때마다 §7 진행 상태, §8 학습 로그, §9 오답 노트를 갱신한다
+- 학습자가 "다음 뭐 해야 돼"라고 물으면 §7 진행 상태와 해당 stage 문서의 "다음 작업"을 읽고, 할 일을 짧은 번호 목록으로 알려준다
 - **구현 단계(1~)의 과제·체크리스트·코드 리뷰 기록은 `docs/oidc/stages/stage-N-*.md` 에 단계별로 따로 둔다.**
   이 문서(SPEC)에는 로드맵, 진행 상태, 학습 로그, 오답 노트만 남긴다
 - **복습 규칙**: 학습자가 "단계 N 복습하자"라고 하면 §9 에서 그 단계의 미해결(❌/△) 항목을 찾아
@@ -30,7 +31,10 @@
 - 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현
 - **better-auth 제거로 같이 사라져서 다시 만들어야 하는 것**:
   - [ ] 로그인/세션 (~~단계 4 선행 조건~~ 2026-10-20 Phase 2 로 유지). 기존 비밀번호 해시(`account` 테이블)는 버림 → 회원 다시 가입
-    - 세션이 생기면 바꿀 곳 2개: `CurrentUserReader.getCurrentUser` 안, `/authorize` 미로그인 처리(지금 임시 `error=login_required` 302 → 로그인 화면 redirect 후 4번 복귀. `login_required` 는 `prompt=none` 전용으로 남김)
+    - 세션이 생기면 바꿀 곳 3개: `CurrentUserReader.getCurrentUser` 안, `/authorize` 미로그인 처리(지금 임시 `error=login_required` 302 → 로그인 화면 redirect 후 4번 복귀. `login_required` 는 `prompt=none` 전용으로 남김), `/authorize` 의 `authTime`(지금 임시 `new Date()` → 세션의 로그인 시각)
+    - 로그인 흐름은 `apps/auth/web` 에 만든다 (2026-10-31 방향). `/authorize` 와 code 발급은 Nest 에 그대로 둔다:
+      Nest `/authorize`(미로그인) → web 로그인 화면 → 로그인 성공·세션 쿠키 → Nest `/authorize` 복귀 → Manager 로 code 발급 → RP 로 302.
+      내부 발급 API(`issue-code`)는 만들지 않으므로 code 발급에는 `@Body()` DTO 가 필요 없고, DTO 는 로그인 요청(이메일·비밀번호)에 쓴다
   - [ ] `user` 테이블 재설계 — 로그인 만들 때 같이 (비밀번호 해시 컬럼 추가, admin 플러그인 잔재 `role`/`banned`/`ban_reason`/`ban_expires` 정리). 단계 3 은 user 를 안 쓰므로 그 전엔 손대지 않음
   - [ ] 전역 인증 가드 + `@AllowAnonymous()` (짝으로 같이). **지금은 가드가 없어서 모든 API 가 공개**
   - [ ] web 화면: 로그인·회원가입·비밀번호 재설정·계정·동의 (git 히스토리 `9fd9858` 에 이전 UI 있음)
@@ -56,6 +60,7 @@
 | Client 인증 | `client_secret_basic` | 가장 단순한 표준 방식 |
 | IdP 서버 | `apps/auth` (NestJS) | 기존 구조 |
 | 로그인/동의 UI | `apps/auth/web` (Next.js) | 기존 구조 |
+| DB 접근 계층 | Reader(조회) / Manager(CUD) 가 DB 직접 호출. 복잡해지면 Repository 계층을 둔다 | 2026-10-23 결정, 2026-10-31 추가. 쿼리가 몇 개뿐일 땐 전달만 하는 층이 됨. 같은 쿼리를 여러 곳에서 쓰거나 트랜잭션을 함께 묶어야 할 때 도입 |
 | RP | **이 레포에서 만들지 않음** (테스트 RP 포함). 실제 RP 는 별도 레포 → [rp-guide.md](rp-guide.md) | IdP 에만 집중 (2026-10-15 결정) |
 | IdP 테스트 방법 | 브라우저 주소창 + `curl` 로 직접 요청 | |
 | issuer (직접 구현) | `http://localhost:3011/api/oidc` | better-auth 제거 후에도 유지 |
@@ -115,7 +120,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - [ ] `response_type=code`, `scope` 에 `openid` 포함 확인
 - [ ] PKCE: `code_challenge` 필수, method `S256` 만 허용
 - [ ] 미로그인 → 로그인 화면으로 보내고, 로그인 후 원래 요청으로 복귀
-- [ ] code 발급: 충분히 긴 랜덤, **1회용**, 짧은 만료(≤ 10분, 권장 1분)
+- [ ] code 발급: 충분히 긴 랜덤, **1회용**, 짧은 만료(≤ 10분, 5분으로 결정)
 - [ ] code 에 묶어 저장: client_id, redirect_uri, user_id, scope, nonce, code_challenge, auth_time
 - 스펙: RFC 6749 §4.1.1–4.1.2, OIDC Core §3.1.2
 
@@ -170,7 +175,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 4 authorize — ①②③ 완료** → 다음 ④ code 테이블+발급 (할 일: [stage-4 "다음 작업"](stages/stage-4-authorize.md)) (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 4 authorize 완료 (2026-10-31)** → 다음 단계 5 token (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -179,7 +184,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 1 RP | ⏭ 범위 밖 (이 레포는 IdP 만) |
 | 2 Discovery | ✅ → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
 | 3 JWKS | ✅ 완료 (2026-10-20) → [stages/stage-3-jwks.md](stages/stage-3-jwks.md) |
-| 4 authorize | ⏳ 진행 중 → [stages/stage-4-authorize.md](stages/stage-4-authorize.md) |
+| 4 authorize | ✅ 완료 (2026-10-31) → [stages/stage-4-authorize.md](stages/stage-4-authorize.md) |
 | 5 token | ⬜ |
 | 6 PKCE | ⬜ |
 | 7 userinfo | ⬜ |
@@ -257,6 +262,9 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
   1단계(throw)/2단계(302) 구분은 "redirect_uri 를 믿을 수 있나"로 이해. 질문: scope 의미, code_challenge_method, state 를 IdP 가 저장하나 → 검사는 안 하지만 정상 흐름에선 ③ 로그인 동안 **들고 가야** 한다고 설명.
   답이 길면 따라오기 어려워함 → **할 일은 짧은 번호 목록으로**.
 - 2026-10-26: 테스트 RP 재검토 → 다시 안 만들기로. 단계 4 는 curl, **단계 5 부터 흐름 검증은 e2e 테스트(supertest)** 로(verifier 생성→authorize→code→token 자동화). 로그인은 env `DEV_LOGIN_USER_ID` 로 테스트에서 조절. 테스트 RP 코드는 git 기록·rp-guide.md 에 남아 있음.
+- 2026-10-31: 단계 4 ④ 구조 정리. code 발급은 `/authorize` 안에서 Manager 직접 호출이라 입력은 class-validator DTO 말고 일반 타입(`ValidationPipe` 는 HTTP 입력에만 동작). 학습자 결정 — 복잡해지면 Repository 계층을 둔다(§3), 로그인 흐름은 web 에(§2 Phase 2). `OidcService` 의 `jwks` 직접 쿼리는 단계 5 에서 서명 키를 읽을 때 Reader/Manager 로 옮긴다.
+- 2026-10-31: 단계 4 완료 확인 6개 통과(302·400·에러 302·DB 에 원문 없음). 생각해볼 질문 채점 → §9 4-13~4-15. PKCE 를 RP 신원 확인으로 혼동(2-5 재발), code 전달 방향 혼동. 5분이 정상 사용자에게 괜찮은지는 결론만 맞음(4-16).
+- 2026-10-31: Referer 질문, 1~10번 흐름의 데이터 모양이 헷갈림 → 값 따라가기가 되는 다이어그램 페이지 제작: [flow-data.html](flow-data.html).
 
 ## 9. 오답 노트 (복습용)
 
@@ -317,6 +325,10 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 4-10 | 2026-10-26 | (개념 질문) nonce 가 뭐야 | "nonce 가 뭐야?" | ❌ | 로그인 1번마다 RP 가 만드는 랜덤값. 2번 생성·쿠키 저장 → 4번 /authorize 로 전송 → IdP 가 code 에 묶어 저장(④) → 9번 id_token 안에 그대로 넣음 → 10번 RP 가 쿠키값과 비교. 막는 것: **다른 로그인의 id_token 을 끼워 넣기(재사용)**. state = 7번 callback(URL) 보호, nonce = 10번 id_token 보호 | 2026-10-26 이어서 "nonce 는 서버 간 통신?" → 아님. 갈 때 4번 **브라우저 URL**(front), 올 때 9번 **id_token 안**(back). 비밀값 아님 — 알아도 id_token 을 위조 못 함(서명은 IdP 개인키) / 2026-10-30 ④ 컬럼 만들며 다시 "nonce 가 뭐야?" → 위키 번호로 재설명(2 생성→3·4 URL→5 저장→9 id_token→10 비교). 아직 정착 안 됨, 단계 5 에서 재확인 |
 | 4-11 | 2026-10-26 | env 의 dev-user 가 DB 에서 지워졌는데 getCurrentUser 가 env 만 보고 돌려주면 | "없는 사용자라 에러" | △ | 에러는 **FK 가 있을 때만**: ④ code insert 가 FK 위반 → 500. FK 가 없으면 더 나쁨 — **조용히 성공**해서 없는 사용자로 code 발급 → 단계 5 id_token `sub=dev-user` 서명 → RP 는 유령 사용자로 로그인. 대응 ① getCurrentUser 가 DB 조회, 없으면 null(=미로그인) ② ④ 테이블 user_id 에 FK | |
 | 4-12 | 2026-10-30 | ④ code 테이블 컬럼 고르기: 8번 /token 에서 ①행 찾기·대조 ②거절 ③9번 id_token 값은 어디서? | "① state 로 대조 ② code_hash ③ 모르겠다" | ❌ | ① state 는 8번에 오지도 않고 DB 에도 없음(6번 callback URL 로 돌려주고 7번에서 RP 가 비교). 행 찾기 = `code_hash`(받은 code 를 해시해서 조회), 대조 = `client_id`·`redirect_uri`·`code_challenge` ② `expires_at`(1분 지남)·`used_at`(이미 씀) ③ 8번 요청엔 없으니 **같은 code 행**에서: `user_id`→sub, `nonce`, `auth_time`. code 행 = 5번에서 저장 → 9번에서 꺼내 확인. "4번 요청 + 로그인 결과"를 9번까지 들고 가는 상자. 검색한 Auth.js `accounts` 스키마는 RP 쪽(9번 토큰 보관)이라 무관 | |
+| 4-13 | 2026-10-31 | code 에 nonce 를 왜 같이 저장하나 | "id_token 에 오는 값, 재사용 방지" | △ | 역할은 맞음. 저장 이유가 빠짐: nonce 는 4번 /authorize 에만 오고 8번 /token 에는 안 옴 → code 에 묶어 둬야 9번 id_token 에 넣을 수 있음. 비교는 IdP 가 아니라 **10번 RP** 가 함 | |
+| 4-14 | 2026-10-31 | code 에 code_challenge 를 왜 같이 저장하나 | "이 RP 에서 요청 온 게 맞는지 보려고?" | △ | "어느 RP" 는 client_secret 이 증명(2-5). PKCE 는 "code 를 가져온 쪽 = **이번 로그인을 시작한 쪽**" 증명. 8번에 오는 code_verifier 를 S256 해서 저장값과 비교 → code 만 훔친 쪽은 verifier 가 없어 실패. 해시만 URL 에 나가므로 저장해도 안전 | |
+| 4-15 | 2026-10-31 | code 만료를 왜 짧게 잡나 | "서버→서버 요청이 아니라 url 에 담겨서 idp 로 오기 때문에?" | △ | URL 노출이 이유인 건 맞음. 방향이 틀림: code 는 7번 **IdP → 브라우저 → RP** 로 URL 에 실려 감(방문 기록·로그·Referer 에 남음). 8번 RP → IdP 는 서버끼리라 안 보임. 그래서 샜을 때 쓸 수 있는 시간을 줄임 | |
+| 4-16 | 2026-10-31 | code 만료가 5분이면 정상 사용자에게 문제없나 | "문제없을 것 같다" | △ | 결론은 맞음, 이유가 빠짐: 7번 callback 을 받은 RP 가 **바로** 8번을 호출해 보통 몇 초 안에 끝나고, 사용자가 할 일이 없음. 로그인에 오래 걸려도 code 는 로그인 **뒤에** 발급되므로 5분에 포함되지 않음 | |
 
 ## 10. 참고 스펙
 
