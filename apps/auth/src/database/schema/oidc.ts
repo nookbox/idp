@@ -32,7 +32,7 @@ export const oidcAuthorizationCodes = pgTable('oidc_authorization_code', {
   nonce: text('nonce'), // RP 가 안 보낼 수도 있음
   codeChallenge: text('code_challenge').notNull(),
   authTime: timestamp('auth_time', { withTimezone: true }).notNull(), // 로그인한 시각
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(), // 발급 + 1분
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(), // 발급+ 5분
   usedAt: timestamp('used_at', { withTimezone: true }), // null = 아직 안 씀
   ...timestamps,
 });

@@ -12,12 +12,14 @@ import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { CurrentUserReader } from '../readers/current-user.reader';
 import { OidcService } from '../services/oidc.service';
+import { OidcManager } from '../managers/oidc.manager';
 
 @Controller('oidc')
 export class OidcController {
   constructor(
     private readonly oidcService: OidcService,
     private readonly currentUserReader: CurrentUserReader,
+    private readonly oidcManager: OidcManager,
   ) {}
   @Get('.well-known/openid-configuration')
   getOidc() {
@@ -75,7 +77,20 @@ export class OidcController {
       });
     }
 
-    res.send(`ok ${currentUser.id}`);
+    const code = await this.oidcManager.issueAuthorizationCode({
+      clientId: query.client_id,
+      userId: currentUser.id,
+      redirectUri: query.redirect_uri,
+      scope: result.scope,
+      nonce: query.nonce,
+      codeChallenge: result.codeChallenge,
+      authTime: new Date(),
+    });
+
+    return this.redirectRP(res, query.redirect_uri, {
+      code,
+      state: query.state,
+    });
   }
 
   private redirectRP(

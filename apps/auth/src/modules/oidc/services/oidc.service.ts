@@ -9,6 +9,9 @@ import { OidcClientReader } from '../readers/oidc-client.reader';
 import { AppLogger, RequestContext } from '@/common/logger';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 
+// base64url(sha256(code_verifier)) 는 패딩 없이 항상 43자
+const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+
 @Injectable()
 export class OidcService implements OnModuleInit {
   constructor(
@@ -116,8 +119,12 @@ export class OidcService implements OnModuleInit {
       return 'invalid_scope';
     }
 
-    if (!codeChallenge || codeChallengeMethod !== 'S256') {
-      this.appLogger.warn(ctx, 'PKCE 파라미터 누락 또는 S256 아님', {
+    if (
+      !codeChallenge ||
+      !S256_CODE_CHALLENGE.test(codeChallenge) ||
+      codeChallengeMethod !== 'S256'
+    ) {
+      this.appLogger.warn(ctx, 'PKCE 파라미터 누락, 형식 오류 또는 S256 아님', {
         clientId,
         codeChallengeMethod,
       });
@@ -125,6 +132,6 @@ export class OidcService implements OnModuleInit {
       return 'invalid_request';
     }
 
-    return RPClient;
+    return { scope, codeChallenge };
   }
 }
