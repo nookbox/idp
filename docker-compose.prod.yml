@@ -99,6 +99,9 @@ services:
       BETTER_AUTH_URL: ${PUBLIC_ORIGIN}
       WEB_URL: ${PUBLIC_ORIGIN}
       CORS_ORIGIN: ${PUBLIC_ORIGIN}
+      # OIDC issuer. 둘 다 없으면 컨테이너가 부팅에서 죽는다 (oidc-config.ts).
+      OIDC_ISSUER: ${PUBLIC_ORIGIN}/api/oidc
+      JWKS_ENCRYPTION_KEY: ${JWKS_ENCRYPTION_KEY}
       # OTP 인증 코드 메일 발송. 둘 다 없으면 컨테이너가 부팅에서 죽는다
       # (mailer.ts 에서 의도적으로 fail-fast). 메일 없이는 아무도 가입을 못 끝낸다.
       RESEND_API_KEY: ${RESEND_API_KEY}
