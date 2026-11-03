@@ -175,7 +175,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 4 authorize 완료 (2026-10-31)** → 다음 단계 5 token (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 5 token 진행 중 (2026-11-03 시작)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -185,7 +185,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 2 Discovery | ✅ → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
 | 3 JWKS | ✅ 완료 (2026-10-20) → [stages/stage-3-jwks.md](stages/stage-3-jwks.md) |
 | 4 authorize | ✅ 완료 (2026-10-31) → [stages/stage-4-authorize.md](stages/stage-4-authorize.md) |
-| 5 token | ⬜ |
+| 5 token | 🟡 진행 중 (2026-11-03) → [stages/stage-5-token.md](stages/stage-5-token.md) |
 | 6 PKCE | ⬜ |
 | 7 userinfo | ⬜ |
 | 8 consent | ⬜ |
@@ -265,6 +265,9 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-10-31: 단계 4 ④ 구조 정리. code 발급은 `/authorize` 안에서 Manager 직접 호출이라 입력은 class-validator DTO 말고 일반 타입(`ValidationPipe` 는 HTTP 입력에만 동작). 학습자 결정 — 복잡해지면 Repository 계층을 둔다(§3), 로그인 흐름은 web 에(§2 Phase 2). `OidcService` 의 `jwks` 직접 쿼리는 단계 5 에서 서명 키를 읽을 때 Reader/Manager 로 옮긴다.
 - 2026-10-31: 단계 4 완료 확인 6개 통과(302·400·에러 302·DB 에 원문 없음). 생각해볼 질문 채점 → §9 4-13~4-15. PKCE 를 RP 신원 확인으로 혼동(2-5 재발), code 전달 방향 혼동. 5분이 정상 사용자에게 괜찮은지는 결론만 맞음(4-16).
 - 2026-10-31: Referer 질문, 1~10번 흐름의 데이터 모양이 헷갈림 → 값 따라가기가 되는 다이어그램 페이지 제작: [flow-data.html](flow-data.html).
+- 2026-11-03: 단계 5 시작 전 확인 Q1 △(보내는 값 일부·비교 대상 누락) Q2 △(secret 검사가 PKCE 보다 먼저, 재사용 시 토큰 폐기 누락) → §9 5-1, 5-2. 과제 문서 stages/stage-5-token.md 작성.
+  access_token 형식 토론: "JWT 여야 하지 않나" → 형식 자유. /userinfo 위치 ❌(RP 라고 답함, 5-3), JWT 폐기 △(5-4).
+  아몬드영·구글·카카오·네이버·Keycloak/Auth0/Okta/Hydra 조사 후 학습자 결정 — **access_token = JWT(RS256, 15분)**. 기준: RP 의 API 여러 개가 직접 검증할 예정. code 재사용은 거절+경고 로그, 이미 나간 토큰은 만료로 끝남. 멘토가 추천을 두 번 바꿔 혼란을 줌 → 앞으로 기준(누가 토큰을 받나)을 먼저 묻고 추천할 것.
 
 ## 9. 오답 노트 (복습용)
 
@@ -329,6 +332,17 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 4-14 | 2026-10-31 | code 에 code_challenge 를 왜 같이 저장하나 | "이 RP 에서 요청 온 게 맞는지 보려고?" | △ | "어느 RP" 는 client_secret 이 증명(2-5). PKCE 는 "code 를 가져온 쪽 = **이번 로그인을 시작한 쪽**" 증명. 8번에 오는 code_verifier 를 S256 해서 저장값과 비교 → code 만 훔친 쪽은 verifier 가 없어 실패. 해시만 URL 에 나가므로 저장해도 안전 | |
 | 4-15 | 2026-10-31 | code 만료를 왜 짧게 잡나 | "서버→서버 요청이 아니라 url 에 담겨서 idp 로 오기 때문에?" | △ | URL 노출이 이유인 건 맞음. 방향이 틀림: code 는 7번 **IdP → 브라우저 → RP** 로 URL 에 실려 감(방문 기록·로그·Referer 에 남음). 8번 RP → IdP 는 서버끼리라 안 보임. 그래서 샜을 때 쓸 수 있는 시간을 줄임 | |
 | 4-16 | 2026-10-31 | code 만료가 5분이면 정상 사용자에게 문제없나 | "문제없을 것 같다" | △ | 결론은 맞음, 이유가 빠짐: 7번 callback 을 받은 RP 가 **바로** 8번을 호출해 보통 몇 초 안에 끝나고, 사용자가 할 일이 없음. 로그인에 오래 걸려도 code 는 로그인 **뒤에** 발급되므로 5분에 포함되지 않음 | |
+
+### 단계 5 — token
+
+| # | 날짜 | 질문 | 학습자 답 | 상태 | 핵심 포인트 (정답) | 복습 이력 |
+|---|---|---|---|---|---|---|
+| 5-1 | 2026-11-03 | RP 가 /token 에 보내는 값과 IdP 가 비교하는 대상 | "client_secret, verifier 로 비교" | △ | 보내는 값 5개: client_id·client_secret(Basic), code, redirect_uri, code_verifier. 비교: secret→`client_secret_hash`, code 해시→`code_hash` 로 행 찾기, 행의 client_id↔인증된 client, redirect_uri↔행 값 정확히 일치, S256(verifier)↔`code_challenge`. 4-12 와 같은 "무엇과 비교" 누락 패턴 | |
+| 5-2 | 2026-11-03 | 훔친 code 로 /token / 이미 쓴 code 재사용 | "verifier 가 안 된다 / 에러" | △ | 우리는 client_secret_basic 이라 **client 인증에서 먼저** 막힘. PKCE 는 secret 까지 샌 경우의 다음 방어선(2-1, 4-14). 재사용은 `invalid_grant` + 그 code 로 발급한 토큰 폐기 고려 — 재사용 자체가 탈취 신호 | |
+| 5-3 | 2026-11-03 | (access_token 형식 고르기) /userinfo 는 어느 서버에 있나 | "RP 에 있다" | ❌ | **IdP(우리 서버)** 에 있다. discovery 의 `userinfo_endpoint` 가 우리 주소. RP 는 access_token 을 들고 IdP 의 /userinfo 를 **부르는 쪽**. 0-3 의 "access_token = RP 가 IdP API 에 내는 출입증"과 같은 이야기. 학습자 첫 생각 "access_token 은 JWT 여야 하지 않나" → 스펙은 형식을 정하지 않음(구글은 opaque) | |
+| 5-4 | 2026-11-03 | JWT access_token 은 어떻게 폐기하나 | "유효기간을 짧게?" | △ | 맞는 대응 중 하나(보통 5~15분). 단 짧게 해도 **만료 전까지는 못 막음**. 즉시 막으려면 `jti` 를 DB 폐기 목록에 넣고 검증 때 조회 → 결국 DB 를 봄 = opaque 와 비슷해짐 | |
+| 5-5 | 2026-11-03 | `Authorization: Basic ...` 에서 client_id·secret 꺼내기 | "base64 디코딩해서 콜론으로 나눈다" | ✅ | 보충: **첫 번째** `:` 에서 나눈다(secret 에 `:` 가 있을 수 있음). 스펙(RFC 6749 §2.3.1)상 두 값은 base64 전에 form-urlencode 돼 있어 디코딩 후 URL 디코드도 해야 정확 | |
+| 5-6 | 2026-11-03 | secret 해시 비교에 `===` 를 쓰면 안 되는 이유 | "멈추는 걸 이용해 유추. 로그인 때 '비밀번호가 틀렸습니다'로 아이디가 맞는 걸 아는 것처럼" | △ | 방향(정보가 새서 유추) 맞음. 비유는 **메시지 차이**(계정 열거), 이건 **응답 시간 차이**(timing attack): 앞 글자가 많이 맞을수록 비교가 늦게 끝남 → 수많은 요청으로 시간을 재서 한 글자씩 맞춤. 둘 다 "응답의 차이로 비밀을 알아내는" 같은 부류. 대응: 끝까지 다 비교하는 상수시간 비교 `crypto.timingSafeEqual`. 우리는 해시끼리 비교라 실제 위험은 작지만 비밀값 비교의 기본 습관 | |
 
 ## 10. 참고 스펙
 
