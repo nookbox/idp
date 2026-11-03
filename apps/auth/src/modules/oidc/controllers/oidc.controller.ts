@@ -1,18 +1,23 @@
+import { AppLogger } from '@/common/logger';
 import { createRequestContext } from '@/common/request-context/util';
 import { env } from '@/config/oidc-config';
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  HttpCode,
+  Post,
   Query,
   Req,
   Res,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
+import { TokenRequestDto } from '../dto/token.dto';
+import { OidcManager } from '../managers/oidc.manager';
 import { CurrentUserReader } from '../readers/current-user.reader';
 import { OidcService } from '../services/oidc.service';
-import { OidcManager } from '../managers/oidc.manager';
 
 @Controller('oidc')
 export class OidcController {
@@ -20,7 +25,10 @@ export class OidcController {
     private readonly oidcService: OidcService,
     private readonly currentUserReader: CurrentUserReader,
     private readonly oidcManager: OidcManager,
-  ) {}
+    private readonly appLogger: AppLogger,
+  ) {
+    this.appLogger.setContext(OidcController.name);
+  }
   @Get('.well-known/openid-configuration')
   getOidc() {
     return {
@@ -104,5 +112,47 @@ export class OidcController {
     }
 
     return res.redirect(302, url.toString());
+  }
+
+  @HttpCode(200)
+  @Post('token')
+  async token(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Body() body: TokenRequestDto,
+  ) {
+    const ctx = createRequestContext(req);
+
+    const { grant_type, code, redirect_uri, code_verifier } = body;
+
+    if (!grant_type) {
+      this.appLogger.warn(ctx, 'invalid_request', { missing: 'grant_type' });
+
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+
+    if (grant_type && grant_type !== 'authorization_code') {
+      this.appLogger.warn(ctx, 'unsupported_grant_type');
+
+      return res.status(400).json({ error: 'unsupported_grant_type' });
+    }
+
+    if (!code) {
+      this.appLogger.warn(ctx, 'invalid_request', { missing: 'code' });
+
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+
+    if (!redirect_uri) {
+      this.appLogger.warn(ctx, 'invalid_request', { missing: 'redirect_uri' });
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+
+    if (!code_verifier) {
+      this.appLogger.warn(ctx, 'invalid_request', { missing: 'code_verifier' });
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+
+    return res.json('ok');
   }
 }
