@@ -16,16 +16,12 @@ import {
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { TokenRequestDto } from '../dto/token.dto';
-import { OidcManager } from '../managers/oidc.manager';
-import { CurrentUserReader } from '../readers/current-user.reader';
 import { OidcService } from '../services/oidc.service';
 
 @Controller('oidc')
 export class OidcController {
   constructor(
     private readonly oidcService: OidcService,
-    private readonly currentUserReader: CurrentUserReader,
-    private readonly oidcManager: OidcManager,
     private readonly appLogger: AppLogger,
   ) {
     this.appLogger.setContext(OidcController.name);
@@ -77,7 +73,7 @@ export class OidcController {
       });
     }
 
-    const currentUser = await this.currentUserReader.getCurrentUser(req);
+    const currentUser = await this.oidcService.getCurrentUser(req);
 
     if (!currentUser) {
       return this.redirectRP(res, query.redirect_uri, {
@@ -86,7 +82,7 @@ export class OidcController {
       });
     }
 
-    const code = await this.oidcManager.issueAuthorizationCode({
+    const code = await this.oidcService.issueAuthorizationCode({
       clientId: query.client_id,
       userId: currentUser.id,
       redirectUri: query.redirect_uri,

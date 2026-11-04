@@ -1,151 +1,45 @@
-import { env } from '@/config/oidc-config';
-import { Database, DATABASE } from '@/database/database.types';
-import { jwks } from '@/database/schema';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
-import { eq } from 'drizzle-orm';
-import * as jose from 'jose';
-import { OidcClientReader } from '../readers/oidc-client.reader';
-import { AppLogger, RequestContext } from '@/common/logger';
+import { RequestContext } from '@/common/logger';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
+import { IssueCodeInput, OidcManager } from '../managers/oidc.manager';
+import { CurrentUserReader } from '../readers/current-user.reader';
+import { OidcReader } from '../readers/oidc.reader';
 
-// base64url(sha256(code_verifier)) 는 패딩 없이 항상 43자
-const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
-
+// 흐름만 표현한다 (메서드당 2~3줄). 검증·판단·DB 접근은 Reader/Manager 에.
 @Injectable()
 export class OidcService implements OnModuleInit {
-  constructor(
-    @Inject(DATABASE) private readonly db: Database,
-    private readonly oidcClientReader: OidcClientReader,
-    private readonly appLogger: AppLogger,
-  ) {
-    this.appLogger.setContext(OidcService.name);
-  }
-
   private readonly logger = new Logger(OidcService.name);
+
+  constructor(
+    private readonly manager: OidcManager,
+    private readonly reader: OidcReader,
+    private readonly currentUserReader: CurrentUserReader,
+  ) {}
 
   // 서버가 뜨기 전 데이터베이스 연결 확인, 초기 데이터 적재 등 수행
   async onModuleInit() {
     this.logger.log('모듈 초기화 완료: onModuleInit 실행됨');
-
-    const [activeKey] = await this.db
-      .select()
-      .from(jwks)
-      .where(eq(jwks.active, true))
-      .limit(1);
-
-    if (!activeKey) {
-      this.logger.warn('활성화된 JWKS 키를 찾을 수 없습니다.');
-
-      const { publicKey, privateKey } = await jose.generateKeyPair('RS256', {
-        extractable: true,
-      });
-
-      const publicJwk = await jose.exportJWK(publicKey);
-      const privateJwk = await jose.exportJWK(privateKey);
-
-      const encryptedPrivateJwk = await new jose.CompactEncrypt(
-        Buffer.from(JSON.stringify(privateJwk)),
-      )
-        .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-        .encrypt(Buffer.from(env.JWKS_ENCRYPTION_KEY, 'base64'));
-
-      const kid = crypto.randomUUID();
-
-      await this.db.insert(jwks).values({
-        kid,
-        publicJwk,
-        privateJwk: encryptedPrivateJwk,
-        active: true,
-      });
-
-      this.logger.log(`새로운 JWKS 키 생성되었습니다.`);
-    }
+    await this.manager.ensureSigningKey();
   }
 
-  async getPublicKeys() {
-    const rows = await this.db
-      .select({ kid: jwks.kid, publicJwk: jwks.publicJwk })
-      .from(jwks);
-
-    return {
-      keys: rows.map(({ publicJwk, kid }) => ({
-        ...publicJwk,
-        kid,
-        alg: 'RS256',
-        use: 'sig',
-      })),
-    };
+  getPublicKeys() {
+    return this.reader.getPublicKeys();
   }
 
-  async authorize(ctx: RequestContext, query: AuthorizeQueryDto) {
-    const {
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: responseType,
-      scope,
-      code_challenge: codeChallenge,
-      code_challenge_method: codeChallengeMethod,
-    } = query;
-
-    const RPClient = await this.oidcClientReader.getByClientId(clientId);
-
-    if (!RPClient) {
-      this.appLogger.warn(ctx, '등록되지 않은 client_id', { clientId });
-      return 'client_Unregistered';
-    }
-
-    if (!RPClient.redirectUris.includes(redirectUri)) {
-      this.appLogger.warn(ctx, '등록되지 않은 redirect_uri', {
-        clientId,
-        redirectUri,
-      });
-      return 'redirect_uri_mismatch';
-    }
-
-    if (responseType !== 'code') {
-      this.appLogger.warn(ctx, '지원되지 않는 response_type', {
-        clientId,
-        responseType,
-      });
-
-      return 'unsupported_response_type';
-    }
-
-    // 공백 구분 목록이라 단어 단위로 비교 ("openidx" 같은 부분 일치 방지)
-    if (!scope?.split(' ').includes('openid')) {
-      this.appLogger.warn(ctx, 'scope 에 openid 없음', { clientId, scope });
-
-      return 'invalid_scope';
-    }
-
-    if (
-      !codeChallenge ||
-      !S256_CODE_CHALLENGE.test(codeChallenge) ||
-      codeChallengeMethod !== 'S256'
-    ) {
-      this.appLogger.warn(ctx, 'PKCE 파라미터 누락, 형식 오류 또는 S256 아님', {
-        clientId,
-        codeChallengeMethod,
-      });
-
-      return 'invalid_request';
-    }
-
-    return { scope, codeChallenge };
+  authorize(ctx: RequestContext, query: AuthorizeQueryDto) {
+    return this.manager.validateAuthorizeRequest(ctx, query);
   }
 
-  async authenticateClient(clientId: string, clientSecret: string) {
-    const RPClient = await this.oidcClientReader.getByClientId(clientId);
+  getCurrentUser(req: Request) {
+    return this.currentUserReader.getCurrentUser(req);
+  }
 
-    if (!RPClient) return 'unknown_client';
+  issueAuthorizationCode(input: IssueCodeInput) {
+    return this.manager.issueAuthorizationCode(input);
+  }
 
-    // bcrypt.compare 가 받은 원문을 저장된 해시의 salt 로 다시 해시해 비교한다
-    const same = await bcrypt.compare(clientSecret, RPClient.clientSecretHash);
-
-    if (!same) return 'secret_mismatch';
-
-    return RPClient;
+  authenticateClient(clientId: string, clientSecret: string) {
+    return this.manager.authenticateClient(clientId, clientSecret);
   }
 }
