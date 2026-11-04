@@ -60,7 +60,7 @@
 | Client 인증 | `client_secret_basic` | 가장 단순한 표준 방식 |
 | IdP 서버 | `apps/auth` (NestJS) | 기존 구조 |
 | 로그인/동의 UI | `apps/auth/web` (Next.js) | 기존 구조 |
-| DB 접근 계층 | Reader(조회) / Manager(CUD) 가 DB 직접 호출. 복잡해지면 Repository 계층을 둔다 | 2026-10-23 결정, 2026-10-31 추가. 쿼리가 몇 개뿐일 땐 전달만 하는 층이 됨. 같은 쿼리를 여러 곳에서 쓰거나 트랜잭션을 함께 묶어야 할 때 도입 |
+| 계층 구조 | **아몬드영과 같게** `Controller → Service → Reader/Manager → Repository`. Service 는 흐름만(메서드당 2~3줄), Reader 는 조회, Manager 는 검증·판단·DB 쓰기, Repository 는 도메인당 1개로 DB 쿼리 전부 | 2026-11-04 학습자 결정(이전: Reader 조회 / Manager CUD 가 DB 직접 호출, Service 가 판단). 차이 하나: 아몬드영은 실패를 throw → 전역 필터지만, OIDC 엔드포인트는 스펙 에러 모양(302 `error=` / `{ error }`) 때문에 Manager 가 **이유 문자열을 돌려주고** 컨트롤러가 응답 모양을 정한다 |
 | RP | **이 레포에서 만들지 않음** (테스트 RP 포함). 실제 RP 는 별도 레포 → [rp-guide.md](rp-guide.md) | IdP 에만 집중 (2026-10-15 결정) |
 | IdP 테스트 방법 | 브라우저 주소창 + `curl` 로 직접 요청 | |
 | issuer (직접 구현) | `http://localhost:3011/api/oidc` | better-auth 제거 후에도 유지 |
@@ -269,6 +269,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
   access_token 형식 토론: "JWT 여야 하지 않나" → 형식 자유. /userinfo 위치 ❌(RP 라고 답함, 5-3), JWT 폐기 △(5-4).
   아몬드영·구글·카카오·네이버·Keycloak/Auth0/Okta/Hydra 조사 후 학습자 결정 — **access_token = JWT(RS256, 15분)**. 기준: RP 의 API 여러 개가 직접 검증할 예정. code 재사용은 거절+경고 로그, 이미 나간 토큰은 만료로 끝남. 멘토가 추천을 두 번 바꿔 혼란을 줌 → 앞으로 기준(누가 토큰을 받나)을 먼저 묻고 추천할 것.
 - 2026-11-03~04: 단계 5 ① 입력 검증, ② client 인증 완료. 학습자 결정 — client_secret 해시를 sha256 → **bcrypt**(아몬드영과 같게). 랜덤 32바이트 secret 이라 sha256 도 충분하다고 설명한 뒤의 선택. 401·WWW-Authenticate 의미, 인가 서버=IdP, reason/region 혼동. 조각을 작게 나눠야 따라옴(한 번에 여러 지적 → "음?").
+- 2026-11-04: 학습자 결정 — 계층을 아몬드영과 같게 바꿈(§3). 멘토가 리팩터링: `OidcRepository` 신설(jwks·client·code·user 쿼리), `OidcClientReader` → `OidcReader`(+ /jwks 응답), 키 생성·authorize 검증·client 인증을 Service → `OidcManager`, Service 는 위임만, 컨트롤러는 Service 만 부름. discovery·jwks·authorize(정상/잘못된 client/openid 없음)·token(맞는/틀린 secret) 회귀 확인.
 
 ## 9. 오답 노트 (복습용)
 
