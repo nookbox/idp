@@ -2,6 +2,7 @@ import { env } from '@/config/oidc-config';
 import { Database, DATABASE } from '@/database/database.types';
 import { jwks } from '@/database/schema';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { eq } from 'drizzle-orm';
 import * as jose from 'jose';
@@ -133,5 +134,18 @@ export class OidcService implements OnModuleInit {
     }
 
     return { scope, codeChallenge };
+  }
+
+  async authenticateClient(clientId: string, clientSecret: string) {
+    const RPClient = await this.oidcClientReader.getByClientId(clientId);
+
+    if (!RPClient) return 'unknown_client';
+
+    // bcrypt.compare 가 받은 원문을 저장된 해시의 salt 로 다시 해시해 비교한다
+    const same = await bcrypt.compare(clientSecret, RPClient.clientSecretHash);
+
+    if (!same) return 'secret_mismatch';
+
+    return RPClient;
   }
 }

@@ -144,6 +144,15 @@ export class OidcController {
     if (!clientId || !clientSecret)
       return this.invalidClient(res, ctx, 'empty_id_or_secret');
 
+    // 실패면 이유 문자열('unknown_client' | 'secret_mismatch'), 성공이면 client 행
+    const client = await this.oidcService.authenticateClient(
+      clientId,
+      clientSecret,
+    );
+    if (typeof client === 'string') {
+      return this.invalidClient(res, ctx, client);
+    }
+
     if (!grant_type) {
       this.appLogger.warn(ctx, 'invalid_request', { missing: 'grant_type' });
 
