@@ -45,9 +45,11 @@
 - [x] 성공은 **200** (Nest POST 기본 201 → 변경. RFC 6749 §5.1)
 
 ### ② client 인증 (실패 → 401 `invalid_client`)
-- [ ] `Authorization: Basic` 헤더에서 client_id / secret 꺼내기
-- [ ] `oidc_client` 에서 찾고, 받은 secret 을 해시해서 저장된 해시와 **상수시간 비교**
-- [ ] 왜 `===` 말고 상수시간 비교인지 설명 가능
+- [x] `Authorization: Basic` 헤더에서 client_id / secret 꺼내기 (첫 `:` 에서 나누고 URL 디코드, 실패 시 401 + `WWW-Authenticate: Basic`)
+- [x] `oidc_client` 에서 찾고, 받은 secret 을 저장된 해시와 비교 — **bcrypt** (2026-11-04 학습자 결정, 아몬드영과 같게. `bcrypt.compare` 가 상수시간 비교 포함). 라이브러리는 네이티브 빌드가 필요 없는 `bcryptjs`
+- [x] 왜 `===` 말고 상수시간 비교인지 설명 가능 (5-6)
+- [x] 응답은 `invalid_client` 하나, 로그에만 이유(`no_authorization_header`·`not_basic_auth`·`no_colon`·`bad_url_encoding`·`empty_id_or_secret`·`unknown_client`·`secret_mismatch`)
+- [x] client 인증을 body 검사보다 **먼저**
 
 ### ③ code 확인 (실패 → 400 `invalid_grant`)
 - [ ] code 해시로 행 찾기 — 없으면 거절
@@ -115,3 +117,10 @@
   - `grant_type &&` 조건 때문에 **grant_type 없이 통과**하던 것 → 없음/지원 안 함을 나눔
   - 201 → 200
   - 남은 것: 배열 등 잘못된 타입은 아직 필터 모양(정상 RP 는 안 보내서 보류)
+- 2026-11-04 ② 완료. 리뷰에서 고친 것:
+  - 헤더 없음을 400 `invalid_request` → 401 `invalid_client` (RFC 6749 §5.2)
+  - `WWW-Authenticate: Bearer` → `Basic` (/token 은 client 를 Basic 으로 받음. Bearer 는 단계 7 /userinfo)
+  - `indexOf(':') === -1` 미처리, `decodeURIComponent` 의 URIError 로 500, catch 의 `return` 누락(응답 2번), try 안 `const` 스코프
+  - 서비스에서 `RPClient.clientSecret` 비교 → DB 엔 해시만 있음(4-4 재발)
+  - 멘토 수정(학습자 요청): sha256 → bcryptjs 교체(seed·service), 컨트롤러에서 `authenticateClient` 호출, 로컬 DB shop 행 해시를 bcrypt 로 UPDATE(새 secret 발급, code 행 FK 때문에 삭제 대신)
+  - 결정: 판단 로직은 Service, DB 쓰기는 Manager (아몬드영은 Manager 가 판단까지 함 — 레포 안에서 통일이 중요)
