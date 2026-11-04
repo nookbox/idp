@@ -1,4 +1,4 @@
-import { AppLogger } from '@/common/logger';
+import { AppLogger, RequestContext } from '@/common/logger';
 import { createRequestContext } from '@/common/request-context/util';
 import { env } from '@/config/oidc-config';
 import {
@@ -6,6 +6,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Post,
   Query,
@@ -101,29 +102,47 @@ export class OidcController {
     });
   }
 
-  private redirectRP(
-    res: Response,
-    redirectUri: string,
-    params: Record<string, string | undefined>,
-  ) {
-    const url = new URL(redirectUri);
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) url.searchParams.set(key, value);
-    }
-
-    return res.redirect(302, url.toString());
-  }
-
   @HttpCode(200)
   @Post('token')
   async token(
     @Req() req: Request,
     @Res() res: Response,
     @Body() body: TokenRequestDto,
+    @Headers('authorization') authHeader?: string,
   ) {
     const ctx = createRequestContext(req);
 
     const { grant_type, code, redirect_uri, code_verifier } = body;
+
+    if (!authHeader) {
+      return this.invalidClient(res, ctx, 'no_authorization_header');
+    }
+
+    if (!authHeader.startsWith('Basic ')) {
+      return this.invalidClient(res, ctx, 'not_basic_auth');
+    }
+
+    // 인증 헤더에서 Basic 인증 정보를 추출하기위해서 인코딩된 문자열 추출함(예: 'Basic bXlDbGllbnRJZDpteUNsaWVudFNlY3JldA==')
+    const encoded = authHeader.slice('Basic '.length);
+
+    const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
+
+    const idx = decoded.indexOf(':');
+
+    if (idx < 0) return this.invalidClient(res, ctx, 'no_colon');
+
+    let clientId: string;
+    let clientSecret: string;
+
+    try {
+      clientId = decodeURIComponent(decoded.slice(0, idx));
+      clientSecret = decodeURIComponent(decoded.slice(idx + 1));
+    } catch {
+      return this.invalidClient(res, ctx, 'bad_url_encoding');
+    }
+
+    if (!clientId || !clientSecret)
+      return this.invalidClient(res, ctx, 'empty_id_or_secret');
 
     if (!grant_type) {
       this.appLogger.warn(ctx, 'invalid_request', { missing: 'grant_type' });
@@ -154,5 +173,24 @@ export class OidcController {
     }
 
     return res.json('ok');
+  }
+
+  private redirectRP(
+    res: Response,
+    redirectUri: string,
+    params: Record<string, string | undefined>,
+  ) {
+    const url = new URL(redirectUri);
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) url.searchParams.set(key, value);
+    }
+
+    return res.redirect(302, url.toString());
+  }
+
+  private invalidClient(res: Response, ctx: RequestContext, reason?: string) {
+    this.appLogger.warn(ctx, 'invalid_client', { reason });
+    res.setHeader('WWW-Authenticate', 'Basic realm="OIDC"');
+    return res.status(401).json({ error: 'invalid_client' });
   }
 }
