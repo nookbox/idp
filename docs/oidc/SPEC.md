@@ -270,6 +270,8 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
   아몬드영·구글·카카오·네이버·Keycloak/Auth0/Okta/Hydra 조사 후 학습자 결정 — **access_token = JWT(RS256, 15분)**. 기준: RP 의 API 여러 개가 직접 검증할 예정. code 재사용은 거절+경고 로그, 이미 나간 토큰은 만료로 끝남. 멘토가 추천을 두 번 바꿔 혼란을 줌 → 앞으로 기준(누가 토큰을 받나)을 먼저 묻고 추천할 것.
 - 2026-11-03~04: 단계 5 ① 입력 검증, ② client 인증 완료. 학습자 결정 — client_secret 해시를 sha256 → **bcrypt**(아몬드영과 같게). 랜덤 32바이트 secret 이라 sha256 도 충분하다고 설명한 뒤의 선택. 401·WWW-Authenticate 의미, 인가 서버=IdP, reason/region 혼동. 조각을 작게 나눠야 따라옴(한 번에 여러 지적 → "음?").
 - 2026-11-04: 학습자 결정 — 계층을 아몬드영과 같게 바꿈(§3). 멘토가 리팩터링: `OidcRepository` 신설(jwks·client·code·user 쿼리), `OidcClientReader` → `OidcReader`(+ /jwks 응답), 키 생성·authorize 검증·client 인증을 Service → `OidcManager`, Service 는 위임만, 컨트롤러는 Service 만 부름. discovery·jwks·authorize(정상/잘못된 client/openid 없음)·token(맞는/틀린 secret) 회귀 확인.
+- 2026-11-05: 단계 5 ③ code 검증(`OidcManager.validateCode`) 작성 중. 계층 규칙 정리 — Manager 안에서 **조회는 Reader, 쓰기는 Repository**(아몬드영 `archive.manager`·`waybill.manager` 확인. 쓰기 직전 재확인 조회만 repo 직접 허용). 주입 이름은 Reader·Repository 가 하나씩이면 `reader`/`repo`, 여러 개면 풀네임. Manager 는 이유 문자열 반환, `res.status` 는 컨트롤러(아몬드영은 throw→전역 필터, OIDC 는 스펙 에러 모양 때문에 다르게 — §3). `oidc_clients`(RP 1개=행 1개, 허용 목록 배열) vs `oidc_authorization_codes`(로그인 1번=행 1개, 실제 쓴 uri 하나) 구분이 학습자에게 "조금씩 잡힘".
+- 2026-11-08: 단계 5 ③ code 검증 + ④ 소진 완료. 학습자가 `validateCode`(7개 검사 + `markCodeUsed` 조건부 update, 동시 요청 대비)를 작성. 멘토 수정: 컨트롤러에서 결과 처리(`typeof === 'string'` → warn `{reason}` + 400 `invalid_grant`), 학습자가 실수로 깨뜨린 Service `authenticateClient` 의 `return` 복구. 실서버로 확인: 틀린 verifier/redirect/없는 code/재사용 → 400 invalid_grant(로그 reason 각각), 정상 → 200. 헷갈린 점: 컨트롤러 변수는 body 에서 꺼낸 스펙 이름(`redirect_uri`) 그대로, 위임 메서드는 "기존 메서드 안"이 아니라 "옆에 새로".
 
 ## 9. 오답 노트 (복습용)
 
@@ -345,6 +347,9 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5-4 | 2026-11-03 | JWT access_token 은 어떻게 폐기하나 | "유효기간을 짧게?" | △ | 맞는 대응 중 하나(보통 5~15분). 단 짧게 해도 **만료 전까지는 못 막음**. 즉시 막으려면 `jti` 를 DB 폐기 목록에 넣고 검증 때 조회 → 결국 DB 를 봄 = opaque 와 비슷해짐 | |
 | 5-5 | 2026-11-03 | `Authorization: Basic ...` 에서 client_id·secret 꺼내기 | "base64 디코딩해서 콜론으로 나눈다" | ✅ | 보충: **첫 번째** `:` 에서 나눈다(secret 에 `:` 가 있을 수 있음). 스펙(RFC 6749 §2.3.1)상 두 값은 base64 전에 form-urlencode 돼 있어 디코딩 후 URL 디코드도 해야 정확 | |
 | 5-6 | 2026-11-03 | secret 해시 비교에 `===` 를 쓰면 안 되는 이유 | "멈추는 걸 이용해 유추. 로그인 때 '비밀번호가 틀렸습니다'로 아이디가 맞는 걸 아는 것처럼" | △ | 방향(정보가 새서 유추) 맞음. 비유는 **메시지 차이**(계정 열거), 이건 **응답 시간 차이**(timing attack): 앞 글자가 많이 맞을수록 비교가 늦게 끝남 → 수많은 요청으로 시간을 재서 한 글자씩 맞춤. 둘 다 "응답의 차이로 비밀을 알아내는" 같은 부류. 대응: 끝까지 다 비교하는 상수시간 비교 `crypto.timingSafeEqual`. 우리는 해시끼리 비교라 실제 위험은 작지만 비밀값 비교의 기본 습관 | |
+| 5-7 | 2026-11-05 | (코드 작성 중) code 만료를 `createdAt` 으로 계산하나 / `if (authCode.expiresAt)` | "created_at 으로 해야 하나?" | ❌ | 발급 때 이미 `expiresAt = 지금 + TTL` 로 저장 → 검사는 `expiresAt.getTime() <= Date.now()` 비교만. createdAt+300 은 TTL 계산이 두 곳에 생김. `if (expiresAt)` 은 값 존재만 봐서 늘 true → 만료 검사가 안 됨. `getTime()`·`Date.now()` 둘 다 ms 숫자라 크기 비교 (10:05 만료, 10:07 요청 → 만료) | |
+| 5-8 | 2026-11-05 | (코드 작성 중) Manager 의 실패 처리 | "return 말고 res.status 처럼 에러를 뿜어야 하지?" | ❌ | Manager 는 HTTP 를 모름 → **이유 문자열 반환**(`code_expired` 등, 로그용으로 자세히). 컨트롤러가 받아 `400 { error: 'invalid_grant' }` 로 통일. 아몬드영은 throw→전역 필터지만 OIDC 는 엔드포인트마다 스펙 에러 모양이 달라 이렇게 함(§3) | |
+| 5-9 | 2026-11-05 | (코드 작성 중) /token 의 redirect_uri 비교에 `new Set(authCode.redirectUri)` | "Set 으로 만들고 get 으로?" | ❌ | code 행의 `redirectUri` 는 **문자열 하나**(이번 로그인에 실제로 쓴 값) → `redirectUri !== authCode.redirectUri` 면 끝. 목록(`redirectUris` 배열)은 `oidc_clients` 쪽이고 /authorize 에서 이미 검사. 두 테이블: `oidc_clients` = RP 1개당 행 1개, `oidc_authorization_codes` = **로그인 1번당 행 1개**(shop 하나에 여러 행). 함정: `new Set('https://..')` 은 글자 단위로 쪼개짐. Set 은 `has`, 배열은 `includes` | |
 
 ## 10. 참고 스펙
 

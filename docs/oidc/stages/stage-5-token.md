@@ -52,17 +52,17 @@
 - [x] client 인증을 body 검사보다 **먼저**
 
 ### ③ code 확인 (실패 → 400 `invalid_grant`)
-- [ ] code 해시로 행 찾기 — 없으면 거절
-- [ ] `expires_at` 지남 → 거절
-- [ ] `used_at` 있음 → 거절 (+ 재사용 대응, ⑥ 참고)
-- [ ] 행의 `client_id` ≠ 인증된 client → 거절
-- [ ] `redirect_uri` 정확히 일치 아님 → 거절
-- [ ] PKCE: verifier 를 S256 한 값 ≠ `code_challenge` → 거절
-- [ ] 실패 이유는 로그에만 자세히, 응답은 `invalid_grant` 하나 (4-9 와 같은 절충)
+- [x] code 해시로 행 찾기 — 없으면 거절
+- [x] `expires_at` 지남 → 거절
+- [x] `used_at` 있음 → 거절 (+ 재사용 대응, ⑥ 참고)
+- [x] 행의 `client_id` ≠ 인증된 client → 거절
+- [x] `redirect_uri` 정확히 일치 아님 → 거절
+- [x] PKCE: verifier 를 S256 한 값 ≠ `code_challenge` → 거절
+- [x] 실패 이유는 로그에만 자세히, 응답은 `invalid_grant` 하나 (4-9 와 같은 절충)
 
 ### ④ code 소진
-- [ ] 검사 통과하면 **바로** `used_at` 기록
-- [ ] 동시에 같은 code 로 두 요청이 오면? 둘 다 통과하지 않게 (조건부 update 등) — 방법은 학습자가 정한다
+- [x] 검사 통과하면 **바로** `used_at` 기록
+- [x] 동시에 같은 code 로 두 요청이 오면? 둘 다 통과하지 않게 (조건부 update 등) — 방법은 학습자가 정한다 → `UPDATE … WHERE used_at IS NULL RETURNING` (2026-11-08 학습자)
 
 ### ⑤ 토큰 발급
 - [ ] 서명 키: `jwks` 에서 active 키 읽기 → Reader 로 옮기기 (2026-10-31 메모)
