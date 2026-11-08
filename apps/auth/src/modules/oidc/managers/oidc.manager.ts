@@ -1,10 +1,10 @@
 import { AppLogger, RequestContext } from '@/common/logger';
-import { env } from '@/config/oidc-config';
 import { OidcAuthorizationCodesRow } from '@/database/schema';
 import { Injectable, Logger } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
+import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { OidcReader } from '../readers/oidc.reader';
 import { OidcRepository } from '../repositories/oidc.repository';
@@ -56,11 +56,7 @@ export class OidcManager {
     const publicJwk = await jose.exportJWK(publicKey);
     const privateJwk = await jose.exportJWK(privateKey);
 
-    const encryptedPrivateJwk = await new jose.CompactEncrypt(
-      Buffer.from(JSON.stringify(privateJwk)),
-    )
-      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-      .encrypt(Buffer.from(env.JWKS_ENCRYPTION_KEY, 'base64'));
+    const encryptedPrivateJwk = await encryptPrivateJwk(privateJwk);
 
     await this.oidcRepository.insertSigningKey({
       kid: crypto.randomUUID(),

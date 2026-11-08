@@ -32,8 +32,8 @@ export class OidcRepository {
     return row ?? null;
   }
 
-  findAllPublicKeys() {
-    return this.db
+  async findAllPublicKeys() {
+    return await this.db
       .select({ kid: jwks.kid, publicJwk: jwks.publicJwk })
       .from(jwks);
   }
