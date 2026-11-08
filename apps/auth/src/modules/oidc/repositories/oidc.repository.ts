@@ -2,13 +2,14 @@ import { DATABASE, type Database } from '@/database/database.types';
 import {
   jwks,
   oidcAuthorizationCodes,
+  OidcAuthorizationCodesRow,
+  OidcClientRow,
   oidcClients,
   user,
 } from '@/database/schema';
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
-export type OidcClientRow = typeof oidcClients.$inferSelect;
 type JwksInsert = typeof jwks.$inferInsert;
 type AuthorizationCodeInsert = typeof oidcAuthorizationCodes.$inferInsert;
 
@@ -59,6 +60,35 @@ export class OidcRepository {
   // ─────────────────────────────────────────
   async insertAuthorizationCode(values: AuthorizationCodeInsert) {
     await this.db.insert(oidcAuthorizationCodes).values(values);
+  }
+
+  async findCodeByHash(
+    codeHash: string,
+  ): Promise<OidcAuthorizationCodesRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(oidcAuthorizationCodes)
+      .where(eq(oidcAuthorizationCodes.codeHash, codeHash))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  // 아직 안 쓴 code 일 때만 used_at 을 채운다. 바뀐 행이 있으면 true.
+  // WHERE used_at IS NULL 이라 같은 code 로 동시에 두 요청이 와도 하나만 성공한다
+  async markCodeUsed(codeHash: string): Promise<boolean> {
+    const rows = await this.db
+      .update(oidcAuthorizationCodes)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(oidcAuthorizationCodes.codeHash, codeHash),
+          isNull(oidcAuthorizationCodes.usedAt),
+        ),
+      )
+      .returning({ codeHash: oidcAuthorizationCodes.codeHash });
+
+    return rows.length > 0;
   }
 
   // ─────────────────────────────────────────

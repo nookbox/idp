@@ -42,4 +42,13 @@ export class OidcService implements OnModuleInit {
   authenticateClient(clientId: string, clientSecret: string) {
     return this.manager.authenticateClient(clientId, clientSecret);
   }
+
+  validateCode(
+    code: string,
+    clientId: string,
+    redirectUri: string,
+    codeVerifier: string,
+  ) {
+    return this.manager.validateCode(code, clientId, redirectUri, codeVerifier);
+  }
 }

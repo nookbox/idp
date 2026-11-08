@@ -177,6 +177,19 @@ export class OidcController {
       return res.status(400).json({ error: 'invalid_request' });
     }
 
+    // 실패면 이유 문자열(code_not_found, pkce_mismatch 등), 성공이면 code 행
+    const authCode = await this.oidcService.validateCode(
+      code,
+      client.clientId,
+      redirect_uri,
+      code_verifier,
+    );
+    if (typeof authCode === 'string') {
+      this.appLogger.warn(ctx, 'invalid_grant', { reason: authCode });
+
+      return res.status(400).json({ error: 'invalid_grant' });
+    }
+
     return res.json('ok');
   }
 

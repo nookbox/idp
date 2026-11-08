@@ -11,6 +11,7 @@ export const jwks = pgTable('jwks', {
   ...timestamps,
 });
 
+// RP 하나 (등록할 때 1번 생김)
 export const oidcClients = pgTable('oidc_clients', {
   clientId: text('client_id').primaryKey(),
   clientSecretHash: text('client_secret_hash').notNull(),
@@ -19,6 +20,7 @@ export const oidcClients = pgTable('oidc_clients', {
   ...timestamps,
 });
 
+// code 발급 1번 (로그인할 때마다 생김)
 export const oidcAuthorizationCodes = pgTable('oidc_authorization_code', {
   codeHash: text('code_hash').primaryKey(),
   clientId: text('client_id')
@@ -36,3 +38,7 @@ export const oidcAuthorizationCodes = pgTable('oidc_authorization_code', {
   usedAt: timestamp('used_at', { withTimezone: true }), // null = 아직 안 씀
   ...timestamps,
 });
+
+export type OidcClientRow = typeof oidcClients.$inferSelect;
+export type OidcAuthorizationCodesRow =
+  typeof oidcAuthorizationCodes.$inferSelect;

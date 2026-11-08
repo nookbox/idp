@@ -1,5 +1,6 @@
 import { AppLogger, RequestContext } from '@/common/logger';
 import { env } from '@/config/oidc-config';
+import { OidcAuthorizationCodesRow } from '@/database/schema';
 import { Injectable, Logger } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -32,8 +33,8 @@ export class OidcManager {
   private readonly logger = new Logger(OidcManager.name);
 
   constructor(
-    private readonly repo: OidcRepository,
-    private readonly reader: OidcReader,
+    private readonly oidcRepository: OidcRepository,
+    private readonly oidcReader: OidcReader,
     private readonly appLogger: AppLogger,
   ) {
     this.appLogger.setContext(OidcManager.name);
@@ -43,7 +44,7 @@ export class OidcManager {
   // 서명 키: 활성 키가 없으면 새로 만든다 (단계 3)
   // ─────────────────────────────────────────
   async ensureSigningKey() {
-    const activeKey = await this.repo.findActiveSigningKey();
+    const activeKey = await this.oidcRepository.findActiveSigningKey();
     if (activeKey) return;
 
     this.logger.warn('활성화된 JWKS 키를 찾을 수 없습니다.');
@@ -61,7 +62,7 @@ export class OidcManager {
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
       .encrypt(Buffer.from(env.JWKS_ENCRYPTION_KEY, 'base64'));
 
-    await this.repo.insertSigningKey({
+    await this.oidcRepository.insertSigningKey({
       kid: crypto.randomUUID(),
       publicJwk,
       privateJwk: encryptedPrivateJwk,
@@ -74,7 +75,10 @@ export class OidcManager {
   // ─────────────────────────────────────────
   // /authorize 파라미터 검증 (단계 4 ②)
   // ─────────────────────────────────────────
-  async validateAuthorizeRequest(ctx: RequestContext, query: AuthorizeQueryDto) {
+  async validateAuthorizeRequest(
+    ctx: RequestContext,
+    query: AuthorizeQueryDto,
+  ) {
     const {
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -84,7 +88,7 @@ export class OidcManager {
       code_challenge_method: codeChallengeMethod,
     } = query;
 
-    const RPClient = await this.reader.getClient(clientId);
+    const RPClient = await this.oidcReader.getClient(clientId);
 
     if (!RPClient) {
       this.appLogger.warn(ctx, '등록되지 않은 client_id', { clientId });
@@ -144,7 +148,7 @@ export class OidcManager {
     // 5분
     const expiresAt = new Date(Date.now() + CODE_TTL_SECONDS * 1000);
 
-    await this.repo.insertAuthorizationCode({
+    await this.oidcRepository.insertAuthorizationCode({
       codeHash,
       clientId: input.clientId,
       userId: input.userId,
@@ -163,7 +167,7 @@ export class OidcManager {
   // /token client 인증 (단계 5 ②)
   // ─────────────────────────────────────────
   async authenticateClient(clientId: string, clientSecret: string) {
-    const RPClient = await this.reader.getClient(clientId);
+    const RPClient = await this.oidcReader.getClient(clientId);
 
     if (!RPClient) return 'unknown_client';
 
@@ -173,5 +177,49 @@ export class OidcManager {
     if (!same) return 'secret_mismatch';
 
     return RPClient;
+  }
+
+  async validateCode(
+    code: string,
+    clientId: string,
+    redirectUri: string,
+    codeVerifier: string,
+  ): Promise<OidcAuthorizationCodesRow | string> {
+    const codeHash = crypto
+      .createHash('sha256')
+      .update(code)
+      .digest('base64url');
+
+    const authCode = await this.oidcReader.getCodeByHash(codeHash);
+    if (!authCode) return 'code_not_found';
+
+    // 만료
+    const expiresAtMs = authCode.expiresAt.getTime();
+    const nowMs = Date.now();
+    if (expiresAtMs <= nowMs) {
+      return 'code_expired';
+    }
+    // 4. 이미 씀   → 'code_already_used'
+    if (authCode.usedAt) {
+      return 'code_already_used';
+    }
+    // 5. client    → 'client_mismatch'
+    if (clientId !== authCode.clientId) return 'client_mismatch';
+    // 6. redirect  → 'redirect_uri_mismatch'
+    if (redirectUri !== authCode.redirectUri) return 'redirect_uri_mismatch';
+    // 7. PKCE      → 'pkce_mismatch'
+    const computedChallenge = crypto
+      .createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64url');
+
+    if (computedChallenge !== authCode.codeChallenge) return 'pkce_mismatch';
+
+    // 8. 사용 처리 → 검사를 다 통과한 뒤, 토큰 만들기 전에.
+    // 동시에 온 다른 요청이 먼저 썼으면(4번은 둘 다 통과) 여기서 걸린다
+    const marked = await this.oidcRepository.markCodeUsed(codeHash);
+    if (!marked) return 'code_already_used';
+
+    return authCode;
   }
 }

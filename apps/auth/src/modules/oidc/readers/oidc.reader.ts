@@ -1,5 +1,6 @@
+import { OidcAuthorizationCodesRow, OidcClientRow } from '@/database/schema';
 import { Injectable } from '@nestjs/common';
-import { OidcClientRow, OidcRepository } from '../repositories/oidc.repository';
+import { OidcRepository } from '../repositories/oidc.repository';
 
 // 조회 전용. Service 와 Repository 사이에서 "찾아서 응답 모양으로 돌려주기"만 한다.
 @Injectable()
@@ -22,5 +23,11 @@ export class OidcReader {
         use: 'sig',
       })),
     };
+  }
+
+  async getCodeByHash(
+    codeHash: string,
+  ): Promise<OidcAuthorizationCodesRow | null> {
+    return this.repo.findCodeByHash(codeHash);
   }
 }
