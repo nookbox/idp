@@ -2,6 +2,7 @@ import { AppLogger, RequestContext } from '@/common/logger';
 import { OidcAuthorizationCodesRow } from '@/database/schema';
 import { Injectable, Logger } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
+import { env } from '@/config/oidc-config';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
 import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
@@ -217,5 +218,26 @@ export class OidcManager {
     if (!marked) return 'code_already_used';
 
     return authCode;
+  }
+
+  // id_token 발급 (단계 5)
+  async issueIdToken(authCode: OidcAuthorizationCodesRow): Promise<string> {
+    const signingKey = await this.oidcReader.getSigningKey();
+    if (!signingKey) throw new Error('서명 키 없음');
+
+    const now = Math.floor(Date.now() / 1000);
+
+    // 서명해서 리턴
+    return new jose.SignJWT({
+      nonce: authCode.nonce ?? undefined,
+      auth_time: Math.floor(authCode.authTime.getTime() / 1000),
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: signingKey.kid })
+      .setIssuer(env.OIDC_ISSUER)
+      .setSubject(authCode.userId)
+      .setAudience(authCode.clientId)
+      .setIssuedAt(now)
+      .setExpirationTime(now + 15 * 60)
+      .sign(signingKey.privateKey);
   }
 }

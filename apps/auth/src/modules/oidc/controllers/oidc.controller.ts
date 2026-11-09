@@ -16,6 +16,7 @@ import {
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { TokenRequestDto } from '../dto/token.dto';
+import { OidcManager } from '../managers/oidc.manager';
 import { OidcService } from '../services/oidc.service';
 
 @Controller('oidc')
@@ -23,6 +24,7 @@ export class OidcController {
   constructor(
     private readonly oidcService: OidcService,
     private readonly appLogger: AppLogger,
+    private readonly oidcManager: OidcManager,
   ) {
     this.appLogger.setContext(OidcController.name);
   }
@@ -190,7 +192,9 @@ export class OidcController {
       return res.status(400).json({ error: 'invalid_grant' });
     }
 
-    return res.json('ok');
+    const id_token = this.oidcManager.issueIdToken(authCode);
+
+    return id_token;
   }
 
   private redirectRP(
