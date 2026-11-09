@@ -240,4 +240,25 @@ export class OidcManager {
       .setExpirationTime(now + 15 * 60)
       .sign(signingKey.privateKey);
   }
+
+  // accessToken발급
+  async issueAccessToken(authCode: OidcAuthorizationCodesRow) {
+    const signingKey = await this.oidcReader.getSigningKey();
+    if (!signingKey) throw new Error('서명 키 없음');
+
+    const now = Math.floor(Date.now() / 1000);
+
+    return new jose.SignJWT({
+      client_id: authCode.clientId, // ① 바뀜: nonce, auth_time 대신
+      scope: authCode.scope, // ①
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: signingKey.kid, typ: 'at+jwt' }) // at+jwt는 이건 accesstoken이다 라는 표시임
+      .setIssuer(env.OIDC_ISSUER)
+      .setSubject(authCode.userId)
+      .setAudience(authCode.clientId)
+      .setIssuedAt(now)
+      .setExpirationTime(now + 15 * 60)
+      .setJti(crypto.randomUUID()) // 토큰마다 붙이는 고유 번호
+      .sign(signingKey.privateKey);
+  }
 }

@@ -5,6 +5,7 @@ import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { IssueCodeInput, OidcManager } from '../managers/oidc.manager';
 import { CurrentUserReader } from '../readers/current-user.reader';
 import { OidcReader } from '../readers/oidc.reader';
+import { OidcAuthorizationCodesRow } from '@/database/schema';
 
 // 흐름만 표현한다 (메서드당 2~3줄). 검증·판단·DB 접근은 Reader/Manager 에.
 @Injectable()
@@ -50,5 +51,12 @@ export class OidcService implements OnModuleInit {
     codeVerifier: string,
   ) {
     return this.manager.validateCode(code, clientId, redirectUri, codeVerifier);
+  }
+  async issueIdToken(authCode: OidcAuthorizationCodesRow): Promise<string> {
+    return await this.manager.issueIdToken(authCode);
+  }
+
+  async issueAccessToken(authCode: OidcAuthorizationCodesRow): Promise<string> {
+    return await this.manager.issueAccessToken(authCode);
   }
 }

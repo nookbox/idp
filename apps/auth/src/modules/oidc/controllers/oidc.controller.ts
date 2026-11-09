@@ -15,16 +15,15 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
-import { TokenRequestDto } from '../dto/token.dto';
-import { OidcManager } from '../managers/oidc.manager';
+import { TokenRequestDto, TokenResDto } from '../dto/token.dto';
 import { OidcService } from '../services/oidc.service';
+import { OAuthErrorRes } from '../dto/oauth-error.dto';
 
 @Controller('oidc')
 export class OidcController {
   constructor(
     private readonly oidcService: OidcService,
     private readonly appLogger: AppLogger,
-    private readonly oidcManager: OidcManager,
   ) {
     this.appLogger.setContext(OidcController.name);
   }
@@ -104,7 +103,7 @@ export class OidcController {
   @Post('token')
   async token(
     @Req() req: Request,
-    @Res() res: Response,
+    @Res() res: Response<TokenResDto | OAuthErrorRes>,
     @Body() body: TokenRequestDto,
     @Headers('authorization') authHeader?: string,
   ) {
@@ -192,9 +191,18 @@ export class OidcController {
       return res.status(400).json({ error: 'invalid_grant' });
     }
 
-    const id_token = this.oidcManager.issueIdToken(authCode);
+    const id_token = await this.oidcService.issueIdToken(authCode);
+    const access_token = await this.oidcService.issueAccessToken(authCode);
 
-    return id_token;
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+
+    return res.json({
+      access_token,
+      token_type: 'Bearer',
+      expires_in: 15 * 60, // 15분뒤 만료
+      id_token,
+    });
   }
 
   private redirectRP(

@@ -19,7 +19,7 @@ export class TokenRequestDto {
   code_verifier?: string;
 }
 
-export class TokenResponseDto {
+export class TokenResDto {
   @IsString()
   access_token: string;
 
