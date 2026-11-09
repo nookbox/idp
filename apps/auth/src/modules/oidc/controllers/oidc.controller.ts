@@ -6,6 +6,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
   HttpCode,
   Post,
@@ -101,6 +102,8 @@ export class OidcController {
 
   @HttpCode(200)
   @Post('token')
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   async token(
     @Req() req: Request,
     @Res() res: Response<TokenResDto | OAuthErrorRes>,
@@ -193,9 +196,6 @@ export class OidcController {
 
     const id_token = await this.oidcService.issueIdToken(authCode);
     const access_token = await this.oidcService.issueAccessToken(authCode);
-
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Pragma', 'no-cache');
 
     return res.json({
       access_token,
