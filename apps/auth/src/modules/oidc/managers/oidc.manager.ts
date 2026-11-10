@@ -9,6 +9,7 @@ import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { OidcReader } from '../readers/oidc.reader';
 import { OidcRepository } from '../repositories/oidc.repository';
+import { UsersReader } from '../../users/readers/users.reader';
 
 export type IssueCodeInput = {
   clientId: string;
@@ -25,6 +26,11 @@ const CODE_TTL_SECONDS = 300;
 // base64url(sha256(code_verifier)) 는 패딩 없이 항상 43자
 const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 
+function hasOpenIdScope(scope?: string | null): scope is string {
+  if (!scope) return false;
+  return scope.split(/\s+/).includes('openid');
+}
+
 // 검증 + 비즈니스 로직 + DB 쓰기.
 // OIDC 엔드포인트는 에러 응답 모양이 스펙으로 정해져 있어서(302 error / { error }),
 // 실패는 throw 하지 않고 이유 문자열로 돌려준다. 컨트롤러가 그걸 보고 응답 모양을 정한다.
@@ -36,6 +42,7 @@ export class OidcManager {
   constructor(
     private readonly oidcRepository: OidcRepository,
     private readonly oidcReader: OidcReader,
+    private readonly usersReader: UsersReader,
     private readonly appLogger: AppLogger,
   ) {
     this.appLogger.setContext(OidcManager.name);
@@ -110,7 +117,7 @@ export class OidcManager {
     }
 
     // 공백 구분 목록이라 단어 단위로 비교 ("openidx" 같은 부분 일치 방지)
-    if (!scope?.split(' ').includes('openid')) {
+    if (!hasOpenIdScope(scope)) {
       this.appLogger.warn(ctx, 'scope 에 openid 없음', { clientId, scope });
 
       return 'invalid_scope';
@@ -225,12 +232,26 @@ export class OidcManager {
     const signingKey = await this.oidcReader.getSigningKey();
     if (!signingKey) throw new Error('서명 키 없음');
 
+    const scopes = authCode.scope.split(/\s+/);
+    const user = await this.usersReader.getUser(authCode.userId);
+
+    if (!user) throw new Error('사용자 없음');
+
     const now = Math.floor(Date.now() / 1000);
 
     // 서명해서 리턴
     return new jose.SignJWT({
       nonce: authCode.nonce ?? undefined,
       auth_time: Math.floor(authCode.authTime.getTime() / 1000),
+      ...(scopes.includes('email') && {
+        email: user.email,
+        email_verified: user.emailVerified,
+      }),
+      // profile scope 있으면
+      ...(scopes.includes('profile') && {
+        name: user.name,
+        picture: user.image ?? undefined,
+      }),
     })
       .setProtectedHeader({ alg: 'RS256', kid: signingKey.kid })
       .setIssuer(env.OIDC_ISSUER)

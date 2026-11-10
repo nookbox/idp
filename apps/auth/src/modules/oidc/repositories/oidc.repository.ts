@@ -5,7 +5,6 @@ import {
   OidcAuthorizationCodesRow,
   OidcClientRow,
   oidcClients,
-  user,
 } from '@/database/schema';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -89,18 +88,5 @@ export class OidcRepository {
       .returning({ codeHash: oidcAuthorizationCodes.codeHash });
 
     return rows.length > 0;
-  }
-
-  // ─────────────────────────────────────────
-  // 사용자
-  // ─────────────────────────────────────────
-  async findUserById(userId: string) {
-    const [row] = await this.db
-      .select()
-      .from(user)
-      .where(eq(user.id, userId))
-      .limit(1);
-
-    return row ?? null;
   }
 }

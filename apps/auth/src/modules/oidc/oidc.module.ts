@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { UsersModule } from '../users/users.module';
 import { OidcController } from './controllers/oidc.controller';
 import { OidcManager } from './managers/oidc.manager';
 import { CurrentUserReader } from './readers/current-user.reader';
@@ -8,6 +9,7 @@ import { OidcService } from './services/oidc.service';
 
 @Global()
 @Module({
+  imports: [UsersModule],
   controllers: [OidcController],
   providers: [
     OidcService,
