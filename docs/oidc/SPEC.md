@@ -272,6 +272,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-11-04: 학습자 결정 — 계층을 아몬드영과 같게 바꿈(§3). 멘토가 리팩터링: `OidcRepository` 신설(jwks·client·code·user 쿼리), `OidcClientReader` → `OidcReader`(+ /jwks 응답), 키 생성·authorize 검증·client 인증을 Service → `OidcManager`, Service 는 위임만, 컨트롤러는 Service 만 부름. discovery·jwks·authorize(정상/잘못된 client/openid 없음)·token(맞는/틀린 secret) 회귀 확인.
 - 2026-11-05: 단계 5 ③ code 검증(`OidcManager.validateCode`) 작성 중. 계층 규칙 정리 — Manager 안에서 **조회는 Reader, 쓰기는 Repository**(아몬드영 `archive.manager`·`waybill.manager` 확인. 쓰기 직전 재확인 조회만 repo 직접 허용). 주입 이름은 Reader·Repository 가 하나씩이면 `reader`/`repo`, 여러 개면 풀네임. Manager 는 이유 문자열 반환, `res.status` 는 컨트롤러(아몬드영은 throw→전역 필터, OIDC 는 스펙 에러 모양 때문에 다르게 — §3). `oidc_clients`(RP 1개=행 1개, 허용 목록 배열) vs `oidc_authorization_codes`(로그인 1번=행 1개, 실제 쓴 uri 하나) 구분이 학습자에게 "조금씩 잡힘".
 - 2026-11-08: 단계 5 ③ code 검증 + ④ 소진 완료. 학습자가 `validateCode`(7개 검사 + `markCodeUsed` 조건부 update, 동시 요청 대비)를 작성. 멘토 수정: 컨트롤러에서 결과 처리(`typeof === 'string'` → warn `{reason}` + 400 `invalid_grant`), 학습자가 실수로 깨뜨린 Service `authenticateClient` 의 `return` 복구. 실서버로 확인: 틀린 verifier/redirect/없는 code/재사용 → 400 invalid_grant(로그 reason 각각), 정상 → 200. 헷갈린 점: 컨트롤러 변수는 body 에서 꺼낸 스펙 이름(`redirect_uri`) 그대로, 위임 메서드는 "기존 메서드 안"이 아니라 "옆에 새로".
+- 2026-11-10: 단계 5 ⑤ 토큰 발급(id_token scope claim 포함, access_token, no-store 헤더) + ⑥ 재사용 warn 로그 완료. user 조회를 `users` 모듈(UsersReader/UsersRepository)로 분리. ⑥ 질문 "랜덤 토큰이면 무엇을 저장?" → "해시" △ (핵심은 토큰 해시 **↔ 발급한 code 연결**). e2e 뼈대 작성(`oidc.e2e.spec.ts`, jest 가 ESM 전용 `jose`·`uuid` 를 변환하도록 `transformIgnorePatterns` 추가). 학습자 피드백: "e2e 부터 짰으면 흐름이 더 와닿았을 것" → **단계 7 부터는 e2e 를 먼저 쓰고 구현(TDD)**.
 
 ## 9. 오답 노트 (복습용)
 
@@ -353,6 +354,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5-10 | 2026-11-09 | (완료 질문 1) /token 응답에 `Cache-Control: no-store` 가 없으면 | "이전 값이 받아와질 수 있다 → 아니다, no-store 는 새로고침 시 새로 받아오는 것" | △ | 첫 생각이 더 가까웠음. "새로 받아오기"는 `no-cache`(쓰기 전 서버에 재확인). `no-store` = **어디에도 저장하지 마라**. 없으면 토큰이 든 응답이 브라우저 디스크 캐시·회사 프록시·CDN 에 남아 **다른 사람이 꺼내 쓸 수** 있음(공용 PC, 공유 프록시). 그래서 RFC 6749 §5.1 이 필수로 정함 | |
 | 5-11 | 2026-11-09 | (완료 질문 2) `used_at` 기록을 id_token 서명 **뒤로** 미루면 | "모르겠다" | ❌ | 검사 통과 ~ `used_at` 기록 사이가 **틈**. 같은 code 로 두 요청이 거의 동시에 오면 둘 다 "아직 안 씀"으로 통과 → 둘 다 토큰을 받음 = 1회용이 깨짐. 서명(키 복호화·RSA)은 느려서 틈이 더 벌어짐. 그래서 검사 통과 **즉시** `UPDATE … WHERE used_at IS NULL` 로 먼저 차지하고, 진 쪽은 `code_already_used`(④). 우리 코드는 `validateCode` 끝에서 소진 후 서명이라 OK | |
 | 5-12 | 2026-11-09 | (완료 질문 3) RP 가 id_token 의 `aud` 를 확인하지 않으면 | "강탈? 다른 RP 가 요청을 가져갈 수 있다?" | △ | "다른 RP" 방향은 맞음, 동작이 흐림. 같은 IdP 에 등록된 **악성 RP(evil)** 가 자기한테 로그인한 철수의 id_token(`aud=evil`, 서명은 진짜)을 받아 **shop 에 내밀면**, shop 은 서명만 보고 통과 → evil 이 **shop 에서 철수로 로그인**. `aud=shop` 확인이 "이건 나한테 발급된 토큰인가"를 막음(0-3 응용 Q3 와 같은 이야기) | |
+| 5-13 | 2026-11-11 | (e2e `getCode` 작성 중) code 는 IdP 가 만드나 RP 가 만드나 | "RP 에서 만든 건가?" | ❌ | code 는 **IdP** 가 로그인 확인 후 만들어 302 Location 으로 돌려줌(`issueAuthorizationCode`). RP 가 만드는 건 `code_verifier`/`code_challenge`·`state`·`nonce`. 테스트에서 `getCode` 가 RP·브라우저 역할을 대신해 **받기만** 해서 헷갈림 | |
 
 ## 10. 참고 스펙
 
