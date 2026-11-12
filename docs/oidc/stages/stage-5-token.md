@@ -65,23 +65,23 @@
 - [x] 동시에 같은 code 로 두 요청이 오면? 둘 다 통과하지 않게 (조건부 update 등) — 방법은 학습자가 정한다 → `UPDATE … WHERE used_at IS NULL RETURNING` (2026-11-08 학습자)
 
 ### ⑤ 토큰 발급
-- [ ] 서명 키: `jwks` 에서 active 키 읽기 → Reader 로 옮기기 (2026-10-31 메모)
-- [ ] id_token (RS256, 헤더에 `kid`)
+- [x] 서명 키: `jwks` 에서 active 키 읽기 → Reader 로 옮기기 (2026-10-31 메모)
+- [x] id_token (RS256, 헤더에 `kid`)
   - `iss` = `OIDC_ISSUER` 그대로, `sub` = user_id, `aud` = client_id
   - `iat`, `exp`, `auth_time`(code 행), `nonce`(code 행에 있을 때만)
   - scope 에 따라 `email`·`email_verified`·`name`·`picture` — `scopes_supported` 밖 scope 는 무시 (단계 4 메모)
-- [ ] access_token: **JWT (RS256, `jwks` active 키로 서명), 만료 15분** — 2026-11-03 학습자 결정
+- [x] access_token: **JWT (RS256, `jwks` active 키로 서명), 만료 15분** — 2026-11-03 학습자 결정
   - 이유: RP 는 API 가 여러 개가 될 예정 → 그 API 들이 IdP 에 묻지 않고 공개키로 직접 검증해야 함.
     Keycloak·Auth0(등록 API)·Okta(커스텀 서버)·아몬드영과 같은 방식. 실무 권장 구조는 BFF(브라우저는 세션 쿠키, BFF → API 는 Bearer access_token)
   - 대가: 만료 전 폐기 불가 → 15분으로 짧게. 진짜 폐기는 단계 9 refresh_token(랜덤 문자열, DB) 에서
-  - 모양은 RFC 9068 참고(`typ: at+jwt`, `iss`·`sub`·`aud`·`exp`·`iat`·`jti`·`client_id`·`scope`). `aud` 를 무엇으로 할지는 ⑤ 시작할 때 정한다
+  - 모양은 RFC 9068 참고(`typ: at+jwt`, `iss`·`sub`·`aud`·`exp`·`iat`·`jti`·`client_id`·`scope`). `aud` = client_id (2026-11-09 결정, 아몬드영과 같게)
   - 단계 7 `/userinfo` 는 이 JWT 를 서명·만료·`iss`·`aud` 로 검증
-- [ ] 응답 헤더 `Cache-Control: no-store`, `Pragma: no-cache`
+- [x] 응답 헤더 `Cache-Control: no-store`, `Pragma: no-cache`
 
 ### ⑥ 재사용 감지 — 2026-11-03 결정
-- [ ] 이미 쓴 code 가 다시 오면 `invalid_grant` 로 거절하고 **경고 로그** (탈취 신호)
+- [x] 이미 쓴 code 가 다시 오면 `invalid_grant` 로 거절하고 **경고 로그** (탈취 신호)
 - 이미 나간 access_token 은 JWT 라 폐기하지 않고 **15분 만료로 끝남**을 받아들인다 (위 ⑤ 결정의 대가)
-- [ ] 랜덤 문자열 토큰이었다면 무엇을 저장해야 폐기할 수 있었는지(토큰 ↔ code 연결) 설명 가능
+- [x] 랜덤 문자열 토큰이었다면 무엇을 저장해야 폐기할 수 있었는지(토큰 ↔ code 연결) 설명 가능
 
 ## 완료 확인 방법
 

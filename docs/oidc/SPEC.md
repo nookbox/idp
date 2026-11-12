@@ -175,7 +175,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 5 token 진행 중 (2026-11-03 시작)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 6 PKCE 점검 (2026-11-12 시작)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -185,8 +185,8 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 2 Discovery | ✅ → [stages/stage-2-discovery.md](stages/stage-2-discovery.md) |
 | 3 JWKS | ✅ 완료 (2026-10-20) → [stages/stage-3-jwks.md](stages/stage-3-jwks.md) |
 | 4 authorize | ✅ 완료 (2026-10-31) → [stages/stage-4-authorize.md](stages/stage-4-authorize.md) |
-| 5 token | 🟡 진행 중 (2026-11-03) → [stages/stage-5-token.md](stages/stage-5-token.md) |
-| 6 PKCE | ⬜ |
+| 5 token | ✅ 완료 (2026-11-12, e2e 7개) → [stages/stage-5-token.md](stages/stage-5-token.md) |
+| 6 PKCE | 🟡 진행 중 (2026-11-12) |
 | 7 userinfo | ⬜ |
 | 8 consent | ⬜ |
 | 9 refresh/logout | ⬜ |
