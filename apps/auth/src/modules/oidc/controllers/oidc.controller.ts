@@ -100,6 +100,7 @@ export class OidcController {
     });
   }
 
+  // RP쪽에서 호출
   @HttpCode(200)
   @Post('token')
   @Header('Cache-Control', 'no-store')
@@ -188,6 +189,7 @@ export class OidcController {
       redirect_uri,
       code_verifier,
     );
+
     if (typeof authCode === 'string') {
       this.appLogger.warn(ctx, 'invalid_grant', { reason: authCode });
 

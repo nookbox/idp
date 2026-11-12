@@ -52,6 +52,7 @@ export class OidcService implements OnModuleInit {
   ) {
     return this.manager.validateCode(code, clientId, redirectUri, codeVerifier);
   }
+
   async issueIdToken(authCode: OidcAuthorizationCodesRow): Promise<string> {
     return await this.manager.issueIdToken(authCode);
   }

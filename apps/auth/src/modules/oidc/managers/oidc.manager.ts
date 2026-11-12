@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { env } from '@/config/oidc-config';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
+import { CODE_TTL_SECONDS } from '../constants/oidc.constants';
 import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { OidcReader } from '../readers/oidc.reader';
@@ -20,8 +21,6 @@ export type IssueCodeInput = {
   codeChallenge: string;
   authTime: Date;
 };
-
-const CODE_TTL_SECONDS = 300;
 
 // base64url(sha256(code_verifier)) 는 패딩 없이 항상 43자
 const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
@@ -212,12 +211,12 @@ export class OidcManager {
     // 6. redirect  → 'redirect_uri_mismatch'
     if (redirectUri !== authCode.redirectUri) return 'redirect_uri_mismatch';
     // 7. PKCE      → 'pkce_mismatch'
-    const computedChallenge = crypto
+    const codeChallenge = crypto
       .createHash('sha256')
       .update(codeVerifier)
       .digest('base64url');
 
-    if (computedChallenge !== authCode.codeChallenge) return 'pkce_mismatch';
+    if (codeChallenge !== authCode.codeChallenge) return 'pkce_mismatch';
 
     // 8. 사용 처리 → 검사를 다 통과한 뒤, 토큰 만들기 전에.
     // 동시에 온 다른 요청이 먼저 썼으면(4번은 둘 다 통과) 여기서 걸린다
