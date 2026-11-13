@@ -16,7 +16,7 @@ const CLIENT_ID = process.env.CLIENT_ID!;
 const CLIENT_SECRET = process.env.CLIENT_SECRET!;
 const REDIRECT_URI = 'http://localhost:4000/callback';
 
-describe('POST /api/oidc/token (e2e)', () => {
+describe('OIDC (e2e)', () => {
   let app: INestApplication;
   let db: Database;
 
@@ -190,5 +190,43 @@ describe('POST /api/oidc/token (e2e)', () => {
 
     const jwksRes = await request(app.getHttpServer()).get('/api/oidc/jwks');
     expect(jwksRes.body.keys.map((k: jose.JWK) => k.kid)).toContain(kid);
+  });
+
+  it('8 /authorize에 code_challenge 없이 요청을하면 error="invalid_request" 를 url에 담아서 보낸다.', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/authorize')
+      .query({
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: 'code',
+        scope: 'openid email profile',
+        // code_challenge: codeChallenge,
+        // code_challenge_method: 'S256',
+      });
+
+    expect(res.status).toBe(302);
+
+    const location = new URL(res.headers.location);
+    expect(location.searchParams.get('error')).toBe('invalid_request');
+    expect(location.searchParams.get('code')).toBeNull(); // 거절했으니 code 는 없어야 함
+  });
+
+  it('9. /token에 code_verifier 없이 요청을 하면 400, invalid_request를 뱉는다.', async () => {
+    const { codeChallenge } = createPkce();
+    const code = await getCode(codeChallenge);
+
+    const res = await request(app.getHttpServer())
+      .post('/api/oidc/token')
+      .auth(CLIENT_ID, CLIENT_SECRET)
+      .type('form')
+      .send({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI,
+        // code_verifier 없음
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_request');
   });
 });
