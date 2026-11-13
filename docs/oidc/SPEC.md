@@ -175,7 +175,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 6 PKCE 점검 (2026-11-12 시작)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 7 userinfo (2026-11-14 시작, e2e 먼저)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -186,8 +186,8 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 3 JWKS | ✅ 완료 (2026-10-20) → [stages/stage-3-jwks.md](stages/stage-3-jwks.md) |
 | 4 authorize | ✅ 완료 (2026-10-31) → [stages/stage-4-authorize.md](stages/stage-4-authorize.md) |
 | 5 token | ✅ 완료 (2026-11-12, e2e 7개) → [stages/stage-5-token.md](stages/stage-5-token.md) |
-| 6 PKCE | 🟡 진행 중 (2026-11-12) |
-| 7 userinfo | ⬜ |
+| 6 PKCE | ✅ 완료 (2026-11-14, e2e 8·9 + 확인 질문 6-1·6-2) |
+| 7 userinfo | 🟡 진행 중 (2026-11-14) → [stages/stage-7-userinfo.md](stages/stage-7-userinfo.md) |
 | 8 consent | ⬜ |
 | 9 refresh/logout | ⬜ |
 | 10 better-auth 제거 | ✅ (2026-10-19, 앞당김) |
@@ -273,6 +273,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-11-05: 단계 5 ③ code 검증(`OidcManager.validateCode`) 작성 중. 계층 규칙 정리 — Manager 안에서 **조회는 Reader, 쓰기는 Repository**(아몬드영 `archive.manager`·`waybill.manager` 확인. 쓰기 직전 재확인 조회만 repo 직접 허용). 주입 이름은 Reader·Repository 가 하나씩이면 `reader`/`repo`, 여러 개면 풀네임. Manager 는 이유 문자열 반환, `res.status` 는 컨트롤러(아몬드영은 throw→전역 필터, OIDC 는 스펙 에러 모양 때문에 다르게 — §3). `oidc_clients`(RP 1개=행 1개, 허용 목록 배열) vs `oidc_authorization_codes`(로그인 1번=행 1개, 실제 쓴 uri 하나) 구분이 학습자에게 "조금씩 잡힘".
 - 2026-11-08: 단계 5 ③ code 검증 + ④ 소진 완료. 학습자가 `validateCode`(7개 검사 + `markCodeUsed` 조건부 update, 동시 요청 대비)를 작성. 멘토 수정: 컨트롤러에서 결과 처리(`typeof === 'string'` → warn `{reason}` + 400 `invalid_grant`), 학습자가 실수로 깨뜨린 Service `authenticateClient` 의 `return` 복구. 실서버로 확인: 틀린 verifier/redirect/없는 code/재사용 → 400 invalid_grant(로그 reason 각각), 정상 → 200. 헷갈린 점: 컨트롤러 변수는 body 에서 꺼낸 스펙 이름(`redirect_uri`) 그대로, 위임 메서드는 "기존 메서드 안"이 아니라 "옆에 새로".
 - 2026-11-10: 단계 5 ⑤ 토큰 발급(id_token scope claim 포함, access_token, no-store 헤더) + ⑥ 재사용 warn 로그 완료. user 조회를 `users` 모듈(UsersReader/UsersRepository)로 분리. ⑥ 질문 "랜덤 토큰이면 무엇을 저장?" → "해시" △ (핵심은 토큰 해시 **↔ 발급한 code 연결**). e2e 뼈대 작성(`oidc.e2e.spec.ts`, jest 가 ESM 전용 `jose`·`uuid` 를 변환하도록 `transformIgnorePatterns` 추가). 학습자 피드백: "e2e 부터 짰으면 흐름이 더 와닿았을 것" → **단계 7 부터는 e2e 를 먼저 쓰고 구현(TDD)**.
+- 2026-11-14: 단계 5 완료(e2e 7개). 단계 6 ① e2e 8·9 추가(code_challenge 없음 → 302 `error=invalid_request`, code_verifier 없음 → 400 `invalid_request`). 헷갈린 점: `it` 안에서 `return` 대신 `expect`, `searchParams.get` 에는 키 이름만, `postToken` 이 돌려주는 건 id_token 이 아니라 응답 전체, 테스트의 kid 는 DB 가 아니라 토큰에서(확인은 바깥에서만, DB 는 준비용). ② 확인 질문 Q1 △, Q2(plain) ❌ → 6-1, 6-2.
 
 ## 9. 오답 노트 (복습용)
 
@@ -355,6 +356,8 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5-11 | 2026-11-09 | (완료 질문 2) `used_at` 기록을 id_token 서명 **뒤로** 미루면 | "모르겠다" | ❌ | 검사 통과 ~ `used_at` 기록 사이가 **틈**. 같은 code 로 두 요청이 거의 동시에 오면 둘 다 "아직 안 씀"으로 통과 → 둘 다 토큰을 받음 = 1회용이 깨짐. 서명(키 복호화·RSA)은 느려서 틈이 더 벌어짐. 그래서 검사 통과 **즉시** `UPDATE … WHERE used_at IS NULL` 로 먼저 차지하고, 진 쪽은 `code_already_used`(④). 우리 코드는 `validateCode` 끝에서 소진 후 서명이라 OK | |
 | 5-12 | 2026-11-09 | (완료 질문 3) RP 가 id_token 의 `aud` 를 확인하지 않으면 | "강탈? 다른 RP 가 요청을 가져갈 수 있다?" | △ | "다른 RP" 방향은 맞음, 동작이 흐림. 같은 IdP 에 등록된 **악성 RP(evil)** 가 자기한테 로그인한 철수의 id_token(`aud=evil`, 서명은 진짜)을 받아 **shop 에 내밀면**, shop 은 서명만 보고 통과 → evil 이 **shop 에서 철수로 로그인**. `aud=shop` 확인이 "이건 나한테 발급된 토큰인가"를 막음(0-3 응용 Q3 와 같은 이야기) | |
 | 5-13 | 2026-11-11 | (e2e `getCode` 작성 중) code 는 IdP 가 만드나 RP 가 만드나 | "RP 에서 만든 건가?" | ❌ | code 는 **IdP** 가 로그인 확인 후 만들어 302 Location 으로 돌려줌(`issueAuthorizationCode`). RP 가 만드는 건 `code_verifier`/`code_challenge`·`state`·`nonce`. 테스트에서 `getCode` 가 RP·브라우저 역할을 대신해 **받기만** 해서 헷갈림 | |
+| 6-1 | 2026-11-14 | (단계 6 Q1) code 만 가로챈 공격자: PKCE 없으면 / 있으면 | "없으면 철수인 척 서버에 요청 가능, 있으면 verifier 로 철수인지 확인" | △ | 방향은 맞음. 정확히는 PKCE 없으면 공격자가 code 를 **/token 에 내고 토큰 교환**(우리는 client_secret 도 필요 → PKCE 는 secret 이 없거나 샌 경우의 추가 방어선). verifier 는 "철수인지"가 아니라 **"/authorize 를 시작한 그 RP 인지"** 확인: verifier 는 RP 서버만 갖고 URL 에 한 번도 안 나옴 → 공격자는 모름 → 4번 테스트처럼 `pkce_mismatch` | |
+| 6-2 | 2026-11-14 | (단계 6 Q2, 2-1 복습) `plain` 허용 시 authorize·callback URL 을 다 본 공격자 | "모르겠다" | ❌ | plain 이면 `code_challenge` = verifier **그대로** → /authorize URL 에서 verifier 획득 + callback URL 에서 code 획득 → /token 의 PKCE 검사 통과. S256 이면 URL 엔 **해시만** 있고 되돌릴 수 없어 verifier 를 모름. 그래서 우리는 `code_challenge_method !== 'S256'` 이면 거절(단계 4). 2-1 이후 두 번째 △/❌ → 다음 복습 때 다시 출제 | |
 
 ## 10. 참고 스펙
 
