@@ -281,4 +281,22 @@ export class OidcManager {
       .setJti(crypto.randomUUID()) // 토큰마다 붙이는 고유 번호
       .sign(signingKey.privateKey);
   }
+
+  async getUserInfo(accessToken: string) {
+    const jwks = jose.createLocalJWKSet(await this.oidcReader.getPublicKeys());
+
+    try {
+      const { payload } = await jose.jwtVerify(accessToken, jwks, {
+        issuer: env.OIDC_ISSUER,
+        algorithms: ['RS256'],
+        typ: 'at+jwt',
+      });
+
+      if (!payload.sub) return 'missing_sub';
+
+      return { sub: payload.sub };
+    } catch {
+      return 'token_verify_failed';
+    }
+  }
 }

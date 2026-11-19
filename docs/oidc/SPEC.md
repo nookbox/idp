@@ -358,6 +358,9 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5-13 | 2026-11-11 | (e2e `getCode` 작성 중) code 는 IdP 가 만드나 RP 가 만드나 | "RP 에서 만든 건가?" | ❌ | code 는 **IdP** 가 로그인 확인 후 만들어 302 Location 으로 돌려줌(`issueAuthorizationCode`). RP 가 만드는 건 `code_verifier`/`code_challenge`·`state`·`nonce`. 테스트에서 `getCode` 가 RP·브라우저 역할을 대신해 **받기만** 해서 헷갈림 | |
 | 6-1 | 2026-11-14 | (단계 6 Q1) code 만 가로챈 공격자: PKCE 없으면 / 있으면 | "없으면 철수인 척 서버에 요청 가능, 있으면 verifier 로 철수인지 확인" | △ | 방향은 맞음. 정확히는 PKCE 없으면 공격자가 code 를 **/token 에 내고 토큰 교환**(우리는 client_secret 도 필요 → PKCE 는 secret 이 없거나 샌 경우의 추가 방어선). verifier 는 "철수인지"가 아니라 **"/authorize 를 시작한 그 RP 인지"** 확인: verifier 는 RP 서버만 갖고 URL 에 한 번도 안 나옴 → 공격자는 모름 → 4번 테스트처럼 `pkce_mismatch` | |
 | 6-2 | 2026-11-14 | (단계 6 Q2, 2-1 복습) `plain` 허용 시 authorize·callback URL 을 다 본 공격자 | "모르겠다" | ❌ | plain 이면 `code_challenge` = verifier **그대로** → /authorize URL 에서 verifier 획득 + callback URL 에서 code 획득 → /token 의 PKCE 검사 통과. S256 이면 URL 엔 **해시만** 있고 되돌릴 수 없어 verifier 를 모름. 그래서 우리는 `code_challenge_method !== 'S256'` 이면 거절(단계 4). 2-1 이후 두 번째 △/❌ → 다음 복습 때 다시 출제 | |
+| 7-1 | 2026-11-14 | (단계 7 시작 Q1) id_token 에도 email 이 있는데 왜 /userinfo 를 따로 부르나 | "그러게요?" | ❌ | id_token = **로그인 순간의 스냅샷**(서명돼 고정). /userinfo = **지금 최신 정보**(로그인 후 이름·사진 바뀌어도 반영). 또 id_token 을 작게 유지하고, 나중에 access_token 만 가진 쪽(refresh 후 등)도 정보를 받을 수 있음 | |
+| 7-2 | 2026-11-14 | (Q2) /userinfo 에 id_token 을 Bearer 로 보내면 | "모르겠다" | ❌ | 받으면 안 됨. id_token 은 RP 에게 "누가 로그인했나"를 알려주는 **신분증**, API 를 부르는 **출입증**이 아님(0-3 방향). 구분은 헤더 `typ: at+jwt`(단계 5 에서 access_token 에만 넣음) | |
+| 7-3 | 2026-11-14 | (Q3) access_token 의 sub 와 /userinfo 응답 sub | "같아야 한다" | ✅ | OIDC Core §5.3.2: RP 는 응답 `sub` 가 id_token `sub` 와 같은지 **반드시** 확인 (다르면 다른 사람 정보로 바꿔치기된 것) | |
 
 ## 10. 참고 스펙
 

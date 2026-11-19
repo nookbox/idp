@@ -17,7 +17,7 @@ IdP → RP 서버  200 { sub, email?, email_verified?, name?, picture? }
 - 입력은 **access_token** (id_token 아님). 단계 5 에서 RFC 9068 모양 JWT 로 만들었다
 - 실패는 **401** + `WWW-Authenticate: Bearer error="invalid_token"` (RFC 6750 §3). /token 의 `Basic` 과 짝
 
-## 시작 전 확인 (답 대기)
+## 시작 전 확인 (2026-11-14) — 결과 Q1 ❌ Q2 ❌ Q3 ✅ (SPEC §9 7-1~7-3)
 
 1. id_token 에도 email·name 이 들어 있는데, RP 는 왜 /userinfo 를 따로 부를까?
 2. /userinfo 에 **id_token** 을 Bearer 로 보내면 받아줘야 할까? 막는다면 무엇으로 구분할까?

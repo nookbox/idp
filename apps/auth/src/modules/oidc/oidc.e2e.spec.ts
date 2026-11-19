@@ -229,4 +229,38 @@ describe('OIDC (e2e)', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('invalid_request');
   });
+
+  it('10. /userinfo 정상 → 200, sub 가 id_token 의 sub 와 같다', async () => {
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge);
+
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const { access_token, id_token } = tokenRes.body;
+
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${access_token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sub).toBe(jose.decodeJwt(id_token).sub);
+  });
+
+  it('11. /userinfo 헤더 없음 → 401, WWW-Authenticate: Bearer', async () => {
+    const res = await request(app.getHttpServer()).get('/api/oidc/userinfo');
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toMatch(/^Bearer/);
+  });
+
+  it('12. /userinfo 깨진 토큰 → 401, invalid_token', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', 'Bearer abc.def.ghi'); // 아무렇게나 만든 가짜 토큰
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBe(
+      'Bearer error="invalid_token"',
+    );
+    expect(res.body.error).toBe('invalid_token');
+  });
 });

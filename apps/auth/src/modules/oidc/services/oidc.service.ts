@@ -60,4 +60,8 @@ export class OidcService implements OnModuleInit {
   async issueAccessToken(authCode: OidcAuthorizationCodesRow): Promise<string> {
     return await this.manager.issueAccessToken(authCode);
   }
+
+  userInfo(accessToken: string) {
+    return this.manager.getUserInfo(accessToken);
+  }
 }

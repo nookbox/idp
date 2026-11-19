@@ -13,6 +13,7 @@ import {
   Query,
   Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
@@ -207,6 +208,27 @@ export class OidcController {
     });
   }
 
+  @Get('/userinfo')
+  async userInfo(
+    @Req() req: Request,
+    @Res() res: Response<{ sub: string } | OAuthErrorRes>,
+    @Headers('authorization') auth?: string,
+  ) {
+    const ctx = createRequestContext(req);
+
+    const m = auth?.match(/^Bearer\s+(.+)$/i);
+
+    if (!m?.[1]) return this.bearerUnauthorized(res, ctx, 'no_bearer_token');
+
+    const userInfo = await this.oidcService.userInfo(m[1]);
+
+    if (typeof userInfo === 'string') {
+      return this.bearerUnauthorized(res, ctx, userInfo, 'invalid_token');
+    }
+
+    return res.json(userInfo);
+  }
+
   private redirectRP(
     res: Response,
     redirectUri: string,
@@ -224,5 +246,20 @@ export class OidcController {
     this.appLogger.warn(ctx, 'invalid_client', { reason });
     res.setHeader('WWW-Authenticate', 'Basic realm="OIDC"');
     return res.status(401).json({ error: 'invalid_client' });
+  }
+
+  private bearerUnauthorized(
+    res: Response,
+    ctx: RequestContext,
+    reason: string,
+    error?: 'invalid_token',
+  ) {
+    this.appLogger.warn(ctx, 'userinfo_unauthorized', { reason });
+
+    res.setHeader(
+      'WWW-Authenticate',
+      error ? `Bearer error="${error}"` : 'Bearer',
+    );
+    return res.status(401).json(error ? { error } : {});
   }
 }
