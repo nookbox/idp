@@ -309,6 +309,16 @@ export class OidcManager {
 
       if (!payload.sub) return 'missing_sub';
 
+      const audClientId = Array.isArray(payload.aud)
+        ? payload.aud[0]
+        : payload.aud;
+
+      if (!audClientId) return 'missing_aud';
+
+      const client = await this.oidcReader.getClient(audClientId);
+
+      if (!client) return 'unknown_client';
+
       const user = await this.usersReader.getUser(payload.sub);
 
       if (!user) return 'user_not_found';

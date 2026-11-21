@@ -13,13 +13,13 @@ import {
   Query,
   Req,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
-import { TokenRequestDto, TokenResDto } from '../dto/token.dto';
-import { OidcService } from '../services/oidc.service';
 import { OAuthErrorRes } from '../dto/oauth-error.dto';
+import { TokenRequestDto, TokenResDto } from '../dto/token.dto';
+import { UserInfoResDto } from '../dto/userinfo.dto';
+import { OidcService } from '../services/oidc.service';
 
 @Controller('oidc')
 export class OidcController {
@@ -211,7 +211,7 @@ export class OidcController {
   @Get('/userinfo')
   async userInfo(
     @Req() req: Request,
-    @Res() res: Response<{ sub: string } | OAuthErrorRes>,
+    @Res() res: Response<UserInfoResDto | OAuthErrorRes>,
     @Headers('authorization') auth?: string,
   ) {
     const ctx = createRequestContext(req);

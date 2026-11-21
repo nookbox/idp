@@ -50,7 +50,10 @@ describe('OIDC (e2e)', () => {
   }
 
   // /authorize 를 불러서 302 Location 에서 code 꺼내기
-  async function getCode(codeChallenge: string) {
+  async function getCode(
+    codeChallenge: string,
+    scope = 'openid email profile',
+  ) {
     // ① 보내기: 서버에 /authorize 요청 (컨트롤러의 @Query 가 이걸 받음)
     const res = await request(app.getHttpServer())
       .get('/api/oidc/authorize')
@@ -58,7 +61,7 @@ describe('OIDC (e2e)', () => {
         client_id: CLIENT_ID,
         redirect_uri: REDIRECT_URI,
         response_type: 'code',
-        scope: 'openid email profile',
+        scope,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
       });
@@ -326,5 +329,83 @@ describe('OIDC (e2e)', () => {
     expect(res.body.email).toBe(idClaims.email);
     expect(res.body.email_verified).toBe(idClaims.email_verified);
     expect(res.body.name).toBe(idClaims.name);
+  });
+
+  it('16. 사용자가 없으면 401을 뱉는다.', async () => {
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge);
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const payload = jose.decodeJwt(tokenRes.body.access_token);
+
+    //  서버와 같은 키로, sub 만 DB 에 없는 id 로 바꿔 다시 서명 (탈퇴한 사용자 흉내)
+    const signingKey = await app.get(OidcReader).getSigningKey();
+    const missingUserToken = await new jose.SignJWT({
+      ...payload,
+      sub: 'no-such-user', // 없는 sub
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: signingKey!.kid, typ: 'at+jwt' })
+      .sign(signingKey!.privateKey);
+
+    // 유저 정보 요청
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${missingUserToken}`);
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBe(
+      'Bearer error="invalid_token"',
+    );
+    expect(res.body.error).toBe('invalid_token');
+  });
+
+  it('17. 등록 안된 client(aud)의 토큰이면 401 invalid_token을 리턴한다.', async () => {
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge);
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const payload = jose.decodeJwt(tokenRes.body.access_token);
+
+    // 서버와 같은 키로, aud 만 등록 안 된 client 로 바꿔 다시 서명 (서명·만료·sub 는 정상)
+    const signingKey = await app.get(OidcReader).getSigningKey();
+    const missingClientToken = await new jose.SignJWT({
+      ...payload,
+      aud: 'no-such-client',
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: signingKey!.kid, typ: 'at+jwt' })
+      .sign(signingKey!.privateKey);
+
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${missingClientToken}`);
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBe(
+      'Bearer error="invalid_token"',
+    );
+    expect(res.body.error).toBe('invalid_token');
+  });
+
+  it('18. openid만 요청하면 sub만 나와야한다.', async () => {
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge, 'openid');
+
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const { access_token, id_token } = tokenRes.body;
+
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${access_token}`);
+
+    const idClaims = jose.decodeJwt(id_token);
+
+    expect(res.status).toBe(200);
+
+    // openid scope 의 claim 은 sub (있어야 함, id_token 과 같아야 함)
+    expect(res.body.sub).toBeDefined();
+    expect(res.body.sub).toBe(idClaims.sub);
+
+    // email·profile scope 를 요청 안 했으니 그 claim 은 없어야 함
+    expect(res.body.email).toBeUndefined();
+    expect(res.body.email_verified).toBeUndefined();
+    expect(res.body.name).toBeUndefined();
   });
 });
