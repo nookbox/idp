@@ -9,6 +9,7 @@ import * as jose from 'jose';
 
 import { AppModule } from '@/app.module';
 import { oidcAuthorizationCodes } from '@/database/schema';
+import { OidcReader } from './readers/oidc.reader';
 import { eq } from 'drizzle-orm';
 import request, { type Response } from 'supertest';
 
@@ -37,10 +38,6 @@ describe('OIDC (e2e)', () => {
   afterAll(async () => {
     await app.close();
   });
-
-  // ─────────────────────────────────────────
-  // 도우미: 매 테스트마다 새 code 가 필요하다 (code 는 한 번만 쓸 수 있으니까)
-  // ─────────────────────────────────────────
 
   function createPkce() {
     const codeVerifier = crypto.randomBytes(32).toString('base64url');
@@ -262,5 +259,72 @@ describe('OIDC (e2e)', () => {
       'Bearer error="invalid_token"',
     );
     expect(res.body.error).toBe('invalid_token');
+  });
+
+  it('13. Bearer에 access_token 대신 id_token을 넣으면 401이 나온다.', async () => {
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge);
+
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const { id_token } = tokenRes.body;
+
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${id_token}`);
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBe(
+      'Bearer error="invalid_token"',
+    );
+    expect(res.body.error).toBe('invalid_token');
+  });
+
+  it('14. 만료된 access_token을 보내면 401 invalid_token이 나온다.', async () => {
+    // 1. 정상 access_token 을 받아서 내용(payload)만 꺼낸다
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge);
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const payload = jose.decodeJwt(tokenRes.body.access_token);
+
+    // 2. 준비: 서버와 같은 키로, exp 만 과거로 바꿔 다시 서명 (서명은 진짜, 만료만 다름)
+    const signingKey = await app.get(OidcReader).getSigningKey();
+    const now = Math.floor(Date.now() / 1000);
+    const expiredToken = await new jose.SignJWT({
+      ...payload,
+      iat: now - 20 * 60, // 20분 전 발급
+      exp: now - 5 * 60, // 5분 전 만료
+    })
+      .setProtectedHeader({ alg: 'RS256', kid: signingKey!.kid, typ: 'at+jwt' })
+      .sign(signingKey!.privateKey);
+
+    // 3. 보내기
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${expiredToken}`);
+
+    expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBe(
+      'Bearer error="invalid_token"',
+    );
+    expect(res.body.error).toBe('invalid_token');
+  });
+
+  it('15. scope에 따라 email과 name이 응답에 나와야한다.', async () => {
+    const { codeChallenge, codeVerifier } = createPkce();
+    const code = await getCode(codeChallenge);
+    const tokenRes = await postToken(code, codeVerifier, REDIRECT_URI);
+    const { access_token, id_token } = tokenRes.body;
+
+    const res = await request(app.getHttpServer())
+      .get('/api/oidc/userinfo')
+      .set('Authorization', `Bearer ${access_token}`);
+
+    const idClaims = jose.decodeJwt(id_token);
+
+    expect(res.status).toBe(200);
+    expect(res.body.email).toBeDefined();
+    expect(res.body.email).toBe(idClaims.email);
+    expect(res.body.email_verified).toBe(idClaims.email_verified);
+    expect(res.body.name).toBe(idClaims.name);
   });
 });

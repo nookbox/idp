@@ -26,19 +26,20 @@ IdP → RP 서버  200 { sub, email?, email_verified?, name?, picture? }
 ## 만들 것
 
 ### ① e2e 먼저 (빨간불)
-- [ ] 정상: /token 으로 받은 access_token → 200, `sub` 가 id_token 의 `sub` 와 같음
-- [ ] scope 에 따라 claim: `openid` 만이면 `sub` 만, `email profile` 이면 email·name 등
-- [ ] Authorization 헤더 없음 → 401 + `WWW-Authenticate: Bearer`
-- [ ] 위조/깨진 토큰 → 401 `invalid_token`
-- [ ] 만료된 토큰 → 401 `invalid_token` (만드는 방법은 학습자가 정한다)
-- [ ] id_token 을 보냄 → 401 (`typ` 이 `at+jwt` 아님)
+- [x] 정상: /token 으로 받은 access_token → 200, `sub` 가 id_token 의 `sub` 와 같음 (e2e 10)
+- [ ] scope 에 따라 claim: `openid` 만이면 `sub` 만, `email profile` 이면 email·name 등 (e2e 15, 다음 할 일)
+- [x] Authorization 헤더 없음 → 401 + `WWW-Authenticate: Bearer` (e2e 11)
+- [x] 위조/깨진 토큰 → 401 `invalid_token` (e2e 12)
+- [x] 만료된 토큰 → 401 `invalid_token` (e2e 14: 서버 서명 키로 `exp` 만 과거로 다시 서명)
+- [x] id_token 을 보냄 → 401 (`typ` 이 `at+jwt` 아님) (e2e 13, 구현 없이 바로 초록불)
+- [ ] 사용자가 없음(삭제) → 401 `invalid_token` (e2e 16, 2026-11-19 추가)
 
 ### ② 구현 (초록불)
-- [ ] `Bearer ` 헤더에서 토큰 꺼내기
-- [ ] 검증: 서명(공개키, `kid` 로 찾기), `alg` RS256 고정, `exp`, `iss`, `aud`, `typ: at+jwt`
+- [x] `Bearer ` 헤더에서 토큰 꺼내기
+- [ ] 검증: 서명(공개키, `kid` 로 찾기), `alg` RS256 고정, `exp`, `iss`, `aud`, `typ: at+jwt` (`aud` 만 남음. 나머지는 `jwtVerify` 옵션·기본 검사, 실패 → `'token_verify_failed'`)
 - [ ] `sub` 로 사용자 조회 (`UsersReader`), 없으면 401
-- [ ] scope → claim (id_token 과 같은 규칙. 중복이면 함께 쓰도록 정리 고려)
-- [ ] 계층: 컨트롤러 → Service → Manager(검증·판단) → Reader
+- [ ] scope → claim (id_token 과 같은 규칙. 중복이면 함께 쓰도록 정리 고려). 값은 user 에서, **넣을지 말지는 scope 로** (2026-11-19 결정)
+- [x] 계층: 컨트롤러 → Service → Manager(검증·판단) → Reader (실패는 이유 문자열 → 컨트롤러 `bearerUnauthorized` 가 401)
 
 ## 완료 확인 방법
 

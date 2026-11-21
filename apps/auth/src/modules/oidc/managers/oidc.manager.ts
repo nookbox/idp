@@ -1,16 +1,17 @@
 import { AppLogger, RequestContext } from '@/common/logger';
-import { OidcAuthorizationCodesRow } from '@/database/schema';
+import { env } from '@/config/oidc-config';
+import { OidcAuthorizationCodesRow, User } from '@/database/schema';
 import { Injectable, Logger } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import { env } from '@/config/oidc-config';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
+import { UsersReader } from '../../users/readers/users.reader';
 import { CODE_TTL_SECONDS } from '../constants/oidc.constants';
 import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { OidcReader } from '../readers/oidc.reader';
 import { OidcRepository } from '../repositories/oidc.repository';
-import { UsersReader } from '../../users/readers/users.reader';
+import { AccessTokenPayload } from '../types/oidc.types';
 
 export type IssueCodeInput = {
   clientId: string;
@@ -28,6 +29,23 @@ const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 function hasOpenIdScope(scope?: string | null): scope is string {
   if (!scope) return false;
   return scope.split(/\s+/).includes('openid');
+}
+
+function scopeToClaims(scope: string, user: User) {
+  const scopes = scope.split(/\s+/);
+
+  const claims = {
+    ...(scopes.includes('email') && {
+      email: user.email,
+      email_verified: user.emailVerified,
+    }),
+    ...(scopes.includes('profile') && {
+      name: user.name,
+      picture: user.image ?? undefined,
+    }),
+  };
+
+  return claims;
 }
 
 // 검증 + 비즈니스 로직 + DB 쓰기.
@@ -231,26 +249,19 @@ export class OidcManager {
     const signingKey = await this.oidcReader.getSigningKey();
     if (!signingKey) throw new Error('서명 키 없음');
 
-    const scopes = authCode.scope.split(/\s+/);
     const user = await this.usersReader.getUser(authCode.userId);
 
     if (!user) throw new Error('사용자 없음');
 
     const now = Math.floor(Date.now() / 1000);
 
+    const claims = scopeToClaims(authCode.scope, user);
+
     // 서명해서 리턴
     return new jose.SignJWT({
       nonce: authCode.nonce ?? undefined,
       auth_time: Math.floor(authCode.authTime.getTime() / 1000),
-      ...(scopes.includes('email') && {
-        email: user.email,
-        email_verified: user.emailVerified,
-      }),
-      // profile scope 있으면
-      ...(scopes.includes('profile') && {
-        name: user.name,
-        picture: user.image ?? undefined,
-      }),
+      ...claims,
     })
       .setProtectedHeader({ alg: 'RS256', kid: signingKey.kid })
       .setIssuer(env.OIDC_ISSUER)
@@ -286,15 +297,25 @@ export class OidcManager {
     const jwks = jose.createLocalJWKSet(await this.oidcReader.getPublicKeys());
 
     try {
-      const { payload } = await jose.jwtVerify(accessToken, jwks, {
-        issuer: env.OIDC_ISSUER,
-        algorithms: ['RS256'],
-        typ: 'at+jwt',
-      });
+      const { payload } = await jose.jwtVerify<AccessTokenPayload>(
+        accessToken,
+        jwks,
+        {
+          issuer: env.OIDC_ISSUER,
+          algorithms: ['RS256'],
+          typ: 'at+jwt', // access token 인것을 보장해줌
+        },
+      );
 
       if (!payload.sub) return 'missing_sub';
 
-      return { sub: payload.sub };
+      const user = await this.usersReader.getUser(payload.sub);
+
+      if (!user) return 'user_not_found';
+
+      const claims = scopeToClaims(payload.scope, user);
+
+      return { sub: payload.sub, ...claims };
     } catch {
       return 'token_verify_failed';
     }
