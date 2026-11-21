@@ -1,6 +1,6 @@
 # 단계 7: `GET /userinfo` — access_token 으로 사용자 정보 주기
 
-> 시작: 2026-11-14 · 상태: 🟡 진행 중
+> 시작: 2026-11-14 · 상태: ✅ 완료 (2026-11-21, e2e 10~18)
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 7 구현 과제와 리뷰 기록만 담는다.
 > **이번 단계부터 e2e 를 먼저 쓰고 구현한다** (2026-11-10 학습자 결정).
 
@@ -27,18 +27,19 @@ IdP → RP 서버  200 { sub, email?, email_verified?, name?, picture? }
 
 ### ① e2e 먼저 (빨간불)
 - [x] 정상: /token 으로 받은 access_token → 200, `sub` 가 id_token 의 `sub` 와 같음 (e2e 10)
-- [ ] scope 에 따라 claim: `openid` 만이면 `sub` 만, `email profile` 이면 email·name 등 (e2e 15, 다음 할 일)
+- [x] scope 에 따라 claim: `email profile` 이면 email·name 등 (e2e 15, 정답은 id_token 의 claim), `openid` 만이면 `sub` 만 (e2e 18, `getCode` 에 scope 매개변수 추가)
 - [x] Authorization 헤더 없음 → 401 + `WWW-Authenticate: Bearer` (e2e 11)
 - [x] 위조/깨진 토큰 → 401 `invalid_token` (e2e 12)
 - [x] 만료된 토큰 → 401 `invalid_token` (e2e 14: 서버 서명 키로 `exp` 만 과거로 다시 서명)
 - [x] id_token 을 보냄 → 401 (`typ` 이 `at+jwt` 아님) (e2e 13, 구현 없이 바로 초록불)
-- [ ] 사용자가 없음(삭제) → 401 `invalid_token` (e2e 16, 2026-11-19 추가)
+- [x] 사용자가 없음(삭제) → 401 `invalid_token` (e2e 16: `sub` 만 DB 에 없는 id 로 다시 서명)
+- [x] 등록 안 된 client(`aud`) → 401 `invalid_token` (e2e 17: `aud` 만 `no-such-client` 로 다시 서명)
 
 ### ② 구현 (초록불)
 - [x] `Bearer ` 헤더에서 토큰 꺼내기
-- [ ] 검증: 서명(공개키, `kid` 로 찾기), `alg` RS256 고정, `exp`, `iss`, `aud`, `typ: at+jwt` (`aud` 만 남음. 나머지는 `jwtVerify` 옵션·기본 검사, 실패 → `'token_verify_failed'`)
-- [ ] `sub` 로 사용자 조회 (`UsersReader`), 없으면 401
-- [ ] scope → claim (id_token 과 같은 규칙. 중복이면 함께 쓰도록 정리 고려). 값은 user 에서, **넣을지 말지는 scope 로** (2026-11-19 결정)
+- [x] 검증: 서명(공개키, `kid` 로 찾기), `alg` RS256 고정, `exp`, `iss`, `typ: at+jwt` 는 `jwtVerify` 옵션·기본 검사(실패 → `'token_verify_failed'`). `aud` 는 client 가 여럿이라 값 고정 불가 → `OidcReader.getClient(aud)` 로 등록 client 인지 확인(없으면 `'unknown_client'`, 비면 `'missing_aud'`)
+- [x] `sub` 로 사용자 조회 (`UsersReader`), 없으면 `'user_not_found'` → 401
+- [x] scope → claim: 값은 user 에서, **넣을지 말지는 scope 로** (2026-11-19 결정). id_token 과 겹쳐서 순수 함수 `scopeToClaims(scope, user)` 로 뺌 (필요한 `scope` 문자열만 받음). 응답 타입 `UserInfoResDto`
 - [x] 계층: 컨트롤러 → Service → Manager(검증·판단) → Reader (실패는 이유 문자열 → 컨트롤러 `bearerUnauthorized` 가 401)
 
 ## 완료 확인 방법

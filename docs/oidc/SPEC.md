@@ -142,8 +142,8 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - 스펙: RFC 7636
 
 ### 단계 7 — `GET /userinfo`
-- [ ] `Authorization: Bearer <access_token>` 검증 (서명·만료·`aud`/issuer)
-- [ ] 토큰의 scope 에 따라 claim 반환, `sub` 는 id_token 과 동일
+- [x] `Authorization: Bearer <access_token>` 검증 (서명·만료·`aud`/issuer)
+- [x] 토큰의 scope 에 따라 claim 반환, `sub` 는 id_token 과 동일
 - 스펙: OIDC Core §5.3
 
 ### 단계 8 — 동의(consent)
@@ -175,7 +175,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 7 userinfo (2026-11-14 시작, e2e 먼저)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 8 consent (단계 7 2026-11-21 완료, e2e 먼저 계속)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -187,7 +187,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 4 authorize | ✅ 완료 (2026-10-31) → [stages/stage-4-authorize.md](stages/stage-4-authorize.md) |
 | 5 token | ✅ 완료 (2026-11-12, e2e 7개) → [stages/stage-5-token.md](stages/stage-5-token.md) |
 | 6 PKCE | ✅ 완료 (2026-11-14, e2e 8·9 + 확인 질문 6-1·6-2) |
-| 7 userinfo | 🟡 진행 중 (2026-11-14) → [stages/stage-7-userinfo.md](stages/stage-7-userinfo.md) |
+| 7 userinfo | ✅ 완료 (2026-11-21, e2e 10~18) → [stages/stage-7-userinfo.md](stages/stage-7-userinfo.md) |
 | 8 consent | ⬜ |
 | 9 refresh/logout | ⬜ |
 | 10 better-auth 제거 | ✅ (2026-10-19, 앞당김) |
@@ -275,6 +275,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-11-10: 단계 5 ⑤ 토큰 발급(id_token scope claim 포함, access_token, no-store 헤더) + ⑥ 재사용 warn 로그 완료. user 조회를 `users` 모듈(UsersReader/UsersRepository)로 분리. ⑥ 질문 "랜덤 토큰이면 무엇을 저장?" → "해시" △ (핵심은 토큰 해시 **↔ 발급한 code 연결**). e2e 뼈대 작성(`oidc.e2e.spec.ts`, jest 가 ESM 전용 `jose`·`uuid` 를 변환하도록 `transformIgnorePatterns` 추가). 학습자 피드백: "e2e 부터 짰으면 흐름이 더 와닿았을 것" → **단계 7 부터는 e2e 를 먼저 쓰고 구현(TDD)**.
 - 2026-11-14: 단계 5 완료(e2e 7개). 단계 6 ① e2e 8·9 추가(code_challenge 없음 → 302 `error=invalid_request`, code_verifier 없음 → 400 `invalid_request`). 헷갈린 점: `it` 안에서 `return` 대신 `expect`, `searchParams.get` 에는 키 이름만, `postToken` 이 돌려주는 건 id_token 이 아니라 응답 전체, 테스트의 kid 는 DB 가 아니라 토큰에서(확인은 바깥에서만, DB 는 준비용). ② 확인 질문 Q1 △, Q2(plain) ❌ → 6-1, 6-2.
 - 2026-11-19: 단계 7 e2e 10~14 초록불. /userinfo 401 은 `@Res()` + 컨트롤러 private 도우미 `bearerUnauthorized`(헤더 없음 → `Bearer`, 토큰 불량 → `Bearer error="invalid_token"` + body). `jwtVerify` 가 throw → 잡지 않으면 500 → Manager 에서 try/catch 로 `'token_verify_failed'` 리턴(이유 문자열은 HTTP 코드가 아니라 **왜**). 13(id_token 보냄)·14(만료)는 `typ`·`exp` 검사 덕에 구현 없이 바로 초록불, 14 는 서버 서명 키로 `exp` 만 과거로 다시 서명. 헷갈린 점: `payload.scope` 가 `unknown`(jose 는 표준 claim 만 타입을 앎), "user 값을 그냥 claim 으로 쓰면?" → 값은 user, **넣을지는 scope**. 비교: almondyoung-server `getUserInfo` 는 scope 무시(1st party 전제), 대신 탈퇴·휴면 사용자 401 → 우리도 e2e 16 으로 추가.
+- 2026-11-21: 단계 7 완료(e2e 15~18 추가, 전체 18개 초록불). 15: scope claim 은 **id_token 의 claim 을 정답**으로 비교(DB 안 봄), `toBeDefined()` 로 `undefined === undefined` 통과 방지, 구현 되돌려 빨간불 확인. 16: `sub` 만 없는 id 로 다시 서명 → `'user_not_found'`. 17: `aud` 는 client 가 여럿이라 `jwtVerify` 에 고정 불가 → `getClient(aud)`(`string | string[]` 처리) → `'unknown_client'`. scope→claim 규칙을 순수 함수 `scopeToClaims(scope, user)` 로 뺌(필요한 값만 받기, 이름은 변환이라 get 아님). 응답 타입 `UserInfoResDto`, 액세스 토큰 내부 모양 `types/oidc.types.ts` 의 `AccessTokenPayload`(scope 는 객체가 아니라 공백 구분 문자열). 헷갈린 점: `??` vs `&&`(includes 는 null 이 안 됨), `...` 펼치기 없이 키로 감싸면 한 겹 더 생김, 이유 문자열(로그용·자유) vs 에러 코드(응답용·스펙 값), Reader 가 왜 있나(Repository 는 읽기·쓰기 둘 다, Reader 는 읽어서 쓸 모양으로). 실수: 16 을 14 복사본으로 둠(만료 때문에 401 → 검증 대상이 아님), 17 에서 `SignJWT` 를 `.sign()` 안 해 엉뚱한 이유로 초록불, `getClient(payload.sub)`, `'open id'` 띄어쓰기, `res.body.openid` 검사(→ 7-4).
 
 ## 9. 오답 노트 (복습용)
 
@@ -362,6 +363,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 7-1 | 2026-11-14 | (단계 7 시작 Q1) id_token 에도 email 이 있는데 왜 /userinfo 를 따로 부르나 | "그러게요?" | ❌ | id_token = **로그인 순간의 스냅샷**(서명돼 고정). /userinfo = **지금 최신 정보**(로그인 후 이름·사진 바뀌어도 반영). 또 id_token 을 작게 유지하고, 나중에 access_token 만 가진 쪽(refresh 후 등)도 정보를 받을 수 있음 | |
 | 7-2 | 2026-11-14 | (Q2) /userinfo 에 id_token 을 Bearer 로 보내면 | "모르겠다" | ❌ | 받으면 안 됨. id_token 은 RP 에게 "누가 로그인했나"를 알려주는 **신분증**, API 를 부르는 **출입증**이 아님(0-3 방향). 구분은 헤더 `typ: at+jwt`(단계 5 에서 access_token 에만 넣음) | |
 | 7-3 | 2026-11-14 | (Q3) access_token 의 sub 와 /userinfo 응답 sub | "같아야 한다" | ✅ | OIDC Core §5.3.2: RP 는 응답 `sub` 가 id_token `sub` 와 같은지 **반드시** 확인 (다르면 다른 사람 정보로 바꿔치기된 것) | |
+| 7-4 | 2026-11-21 | (e2e 18 작성 중) openid 만 요청하면 응답에 무엇이 있어야 하나 | `res.body.openid` 가 있는지 검사 | ❌ | `openid` 는 **scope 이름**이지 claim 이 아님(2026-11-19 "openid 는 claim 에 안 담아도 되지?" 에서 다룬 내용). openid scope 의 대가는 `sub` → `sub` 는 있고 `email`·`name` 은 `toBeUndefined()`. 핵심은 **요청 안 한 정보가 안 나가는지** 확인하는 것 | |
 
 ## 10. 참고 스펙
 
