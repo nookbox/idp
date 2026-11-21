@@ -175,7 +175,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 8 consent (단계 7 2026-11-21 완료, e2e 먼저 계속)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 8 consent (2026-11-22 시작, e2e 먼저)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -188,7 +188,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5 token | ✅ 완료 (2026-11-12, e2e 7개) → [stages/stage-5-token.md](stages/stage-5-token.md) |
 | 6 PKCE | ✅ 완료 (2026-11-14, e2e 8·9 + 확인 질문 6-1·6-2) |
 | 7 userinfo | ✅ 완료 (2026-11-21, e2e 10~18) → [stages/stage-7-userinfo.md](stages/stage-7-userinfo.md) |
-| 8 consent | ⬜ |
+| 8 consent | 🟡 진행 중 (2026-11-22) → [stages/stage-8-consent.md](stages/stage-8-consent.md) |
 | 9 refresh/logout | ⬜ |
 | 10 better-auth 제거 | ✅ (2026-10-19, 앞당김) |
 
@@ -364,6 +364,9 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 7-2 | 2026-11-14 | (Q2) /userinfo 에 id_token 을 Bearer 로 보내면 | "모르겠다" | ❌ | 받으면 안 됨. id_token 은 RP 에게 "누가 로그인했나"를 알려주는 **신분증**, API 를 부르는 **출입증**이 아님(0-3 방향). 구분은 헤더 `typ: at+jwt`(단계 5 에서 access_token 에만 넣음) | |
 | 7-3 | 2026-11-14 | (Q3) access_token 의 sub 와 /userinfo 응답 sub | "같아야 한다" | ✅ | OIDC Core §5.3.2: RP 는 응답 `sub` 가 id_token `sub` 와 같은지 **반드시** 확인 (다르면 다른 사람 정보로 바꿔치기된 것) | |
 | 7-4 | 2026-11-21 | (e2e 18 작성 중) openid 만 요청하면 응답에 무엇이 있어야 하나 | `res.body.openid` 가 있는지 검사 | ❌ | `openid` 는 **scope 이름**이지 claim 이 아님(2026-11-19 "openid 는 claim 에 안 담아도 되지?" 에서 다룬 내용). openid scope 의 대가는 `sub` → `sub` 는 있고 `email`·`name` 은 `toBeUndefined()`. 핵심은 **요청 안 한 정보가 안 나가는지** 확인하는 것 | |
+| 8-1 | 2026-11-22 | (단계 8 시작 Q1) 자사 앱만 붙는 IdP 에 동의 화면이 필요한가 | "같은 서비스라 필요 없다" | ✅ | 운영자가 같으면 정보가 회사 밖으로 안 나감. 보충: IdP 전체가 아니라 **client 마다** 정함(자사 앱은 생략, 외부 앱은 물음) → client 에 "동의 생략" 표시 | |
+| 8-2 | 2026-11-22 | (Q2) email 허용·profile 거부면 토큰 scope | "email 과 openid 만" | ✅ | 보충: `openid` 는 OIDC 필수라 보통 고를 수 없게 함. 토큰 scope 는 **요청한 것이 아니라 허락받은 것** → 단계 7 `scopeToClaims` 가 자동으로 거름 | |
+| 8-3 | 2026-11-22 | (Q3) 동의 저장 조합 | "scope 와 userId 혹은 sub" | △ | **client** 가 빠짐. user+scope 만이면 shop 에 한 동의로 처음 보는 evil-app 도 통과. 동의 = "누가(user) 어느 앱(client)에게 무엇(scope)을" → 키 = **user + client**, 값 = scope. sub 와 userId 는 우리 IdP 에서 같은 값 | |
 
 ## 10. 참고 스펙
 
