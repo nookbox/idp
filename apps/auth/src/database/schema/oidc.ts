@@ -17,6 +17,7 @@ export const oidcClients = pgTable('oidc_clients', {
   clientSecretHash: text('client_secret_hash').notNull(),
   redirectUris: text('redirect_uris').array().notNull(),
   name: text('name').notNull(), // RP client name
+  skipConsent: boolean('skip_consent').default(false).notNull(),
   ...timestamps,
 });
 

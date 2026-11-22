@@ -5,10 +5,11 @@
  *   pnpm tsx --env-file=.env scripts/seed-oidc-client.ts
  *
  * client_secret 원문은 처음 등록할 때 한 번만 출력된다. DB 에는 해시만 저장한다.
- * 이미 등록돼 있으면 아무것도 바꾸지 않는다. secret 을 다시 받으려면 행을 지우고 재실행.
+ * 이미 등록돼 있으면 secret 은 바꾸지 않는다(다시 받으려면 행을 지우고 재실행). skipConsent 만 아래 값으로 맞춘다.
  */
 import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import { eq } from 'drizzle-orm';
 import { db, sql } from '../src/database/client';
 import { oidcClients } from '../src/database/schema';
 
@@ -16,6 +17,8 @@ const CLIENT = {
   clientId: 'shop',
   name: 'Shop',
   redirectUris: ['http://localhost:4000/callback'],
+  // 자사(1st party) 테스트 RP → 동의 화면 생략. token·userinfo e2e 가 이 client 로 code 를 바로 받는다 (단계 8)
+  skipConsent: true,
 };
 
 async function main() {
@@ -31,8 +34,14 @@ async function main() {
 
   // 이미 있으면 방금 만든 secret 은 DB 해시와 짝이 아니다 → 출력하면 안 된다
   if (inserted.length === 0) {
+    // 이미 있는 행(컬럼 추가 전에 등록된 것 포함)도 skipConsent 는 맞춰 둔다
+    await db
+      .update(oidcClients)
+      .set({ skipConsent: CLIENT.skipConsent })
+      .where(eq(oidcClients.clientId, CLIENT.clientId));
+
     console.log(
-      `이미 등록됨: ${CLIENT.clientId} (secret 은 다시 보여줄 수 없음)`,
+      `이미 등록됨: ${CLIENT.clientId} (secret 은 다시 보여줄 수 없음, skipConsent=${CLIENT.skipConsent} 로 맞춤)`,
     );
     return;
   }
