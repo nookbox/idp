@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
+import { ConsentBodyDto, ConsentResDto } from '../dto/consent.dto';
 import { OAuthErrorRes } from '../dto/oauth-error.dto';
 import { TokenRequestDto, TokenResDto } from '../dto/token.dto';
 import { UserInfoResDto } from '../dto/userinfo.dto';
@@ -85,6 +86,19 @@ export class OidcController {
       });
     }
 
+    const needsConsent = await this.oidcService.needsConsent(
+      query.client_id,
+      currentUser.id,
+      result.scope,
+    );
+    // 동의가 필요하면 code 대신 web 의 동의 화면으로 (요청은 서명해서 URL 에 싣는다)
+    if (needsConsent) {
+      return res.redirect(
+        302,
+        this.oidcService.makeConsentUrl(query, currentUser.id),
+      );
+    }
+
     const code = await this.oidcService.issueAuthorizationCode({
       clientId: query.client_id,
       userId: currentUser.id,
@@ -98,6 +112,45 @@ export class OidcController {
     return this.redirectRP(res, query.redirect_uri, {
       code,
       state: query.state,
+    });
+  }
+
+  // 동의 화면(web)이 [허용]/[거부] 때 fetch 로 호출. 응답 url 로 web 이 브라우저를 옮긴다
+  @HttpCode(200)
+  @Post('consent')
+  async consent(
+    @Req() req: Request,
+    @Res() res: Response<ConsentResDto | OAuthErrorRes>,
+    @Body() body: ConsentBodyDto,
+    @Headers('origin') origin?: string,
+  ) {
+    const ctx = createRequestContext(req);
+
+    // CSRF: 서명은 "내용"만 지킨다. "누가 보냈나"는 Origin 으로 — 우리 web 에서 온 것만 받는다
+    if (origin !== new URL(env.WEB_URL).origin) {
+      this.appLogger.warn(ctx, 'consent_bad_origin', { origin });
+      return res.status(403).json({ error: 'access_denied' });
+    }
+
+    const currentUser = await this.oidcService.getCurrentUser(req);
+    if (!currentUser) {
+      return res.status(401).json({ error: 'login_required' });
+    }
+
+    const result = await this.oidcService.decideConsent(
+      ctx,
+      body,
+      currentUser.id,
+    );
+
+    // 서명 깨짐·만료·scope 벗어남 등. 이유는 로그에만, 응답은 invalid_request 하나로
+    if (typeof result === 'string') {
+      this.appLogger.warn(ctx, 'consent_invalid', { reason: result });
+      return res.status(400).json({ error: 'invalid_request' });
+    }
+
+    return res.json({
+      url: this.makeRpUrl(result.redirectUri, result.params),
     });
   }
 
@@ -234,12 +287,19 @@ export class OidcController {
     redirectUri: string,
     params: Record<string, string | undefined>,
   ) {
+    return res.redirect(302, this.makeRpUrl(redirectUri, params));
+  }
+
+  // redirect_uri 에 code/error/state 를 붙인 주소 (302 로 보내거나, consent 처럼 JSON 으로 주거나)
+  private makeRpUrl(
+    redirectUri: string,
+    params: Record<string, string | undefined>,
+  ) {
     const url = new URL(redirectUri);
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined) url.searchParams.set(key, value);
     }
-
-    return res.redirect(302, url.toString());
+    return url.toString();
   }
 
   private invalidClient(res: Response, ctx: RequestContext, reason?: string) {

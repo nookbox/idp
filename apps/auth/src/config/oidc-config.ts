@@ -15,6 +15,16 @@ const schema = z.object({
       'base64 32바이트여야 합니다 (openssl rand -base64 32)',
     ),
 
+  OIDC_CONSENT_SECRET: z
+    .string('OIDC_CONSENT_SECRET 이 없습니다 (openssl rand -base64 32)')
+    .refine(
+      (s) => Buffer.from(s, 'base64').length >= 32,
+      'base64 32바이트 이상이어야 합니다 (openssl rand -base64 32)',
+    ),
+
+  // 동의 화면이 있는 web 주소. 동의 URL 을 만들 때, 그리고 POST /consent 의 Origin 검사에 쓴다
+  WEB_URL: z.url('WEB_URL 이 없거나 URL 형식이 아닙니다'),
+
   DEV_LOGIN_USER_ID: z.string().optional(), // 개발 환경에서 로그인할 사용자 ID
 });
 

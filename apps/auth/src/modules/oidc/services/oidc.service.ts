@@ -2,6 +2,7 @@ import { RequestContext } from '@/common/logger';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
+import { ConsentBodyDto } from '../dto/consent.dto';
 import { IssueCodeInput, OidcManager } from '../managers/oidc.manager';
 import { CurrentUserReader } from '../readers/current-user.reader';
 import { OidcReader } from '../readers/oidc.reader';
@@ -34,6 +35,18 @@ export class OidcService implements OnModuleInit {
 
   getCurrentUser(req: Request) {
     return this.currentUserReader.getCurrentUser(req);
+  }
+
+  needsConsent(clientId: string, userId: string, scope: string) {
+    return this.manager.needsConsent(clientId, userId, scope);
+  }
+
+  makeConsentUrl(query: AuthorizeQueryDto, userId: string) {
+    return this.manager.makeConsentUrl(query, userId);
+  }
+
+  decideConsent(ctx: RequestContext, body: ConsentBodyDto, userId: string) {
+    return this.manager.decideConsent(ctx, body, userId);
   }
 
   issueAuthorizationCode(input: IssueCodeInput) {

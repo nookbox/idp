@@ -1,4 +1,11 @@
-import { boolean, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 import type { JWK } from 'jose';
 import { user } from './auth';
 import { timestamps } from './timestamps';
@@ -40,6 +47,24 @@ export const oidcAuthorizationCodes = pgTable('oidc_authorization_code', {
   ...timestamps,
 });
 
+// 사용자가 client 에 허락한 scope (user + client 당 1행)
+// 다시 /authorize 가 오면 "요청 scope 가 여기 안에 다 들어 있나" 로 동의 화면을 건너뛴다
+export const oidcConsents = pgTable(
+  'oidc_consents',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => oidcClients.clientId, { onDelete: 'cascade' }),
+    scope: text('scope').notNull(), // 'openid email' 처럼 공백으로 이어 붙인 문자열
+    ...timestamps,
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.clientId] })],
+);
+
 export type OidcClientRow = typeof oidcClients.$inferSelect;
 export type OidcAuthorizationCodesRow =
   typeof oidcAuthorizationCodes.$inferSelect;
+export type OidcConsentRow = typeof oidcConsents.$inferSelect;

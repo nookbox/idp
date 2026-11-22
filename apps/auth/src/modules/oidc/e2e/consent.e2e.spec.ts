@@ -95,8 +95,7 @@ describe('OIDC consent (e2e)', () => {
 
   afterAll(async () => {
     if (createdClientIds.length > 0) {
-      // client 를 참조하는 행 먼저 지운다
-      // TODO: 동의 테이블을 만들면 그 행도 여기서 먼저 지우기 (FK 가 cascade 면 생략 가능)
+      // client 를 참조하는 행 먼저 지운다 (동의 행은 FK cascade 라 client 와 같이 지워짐)
       await db
         .delete(oidcAuthorizationCodes)
         .where(inArray(oidcAuthorizationCodes.clientId, createdClientIds));

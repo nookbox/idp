@@ -1,4 +1,8 @@
-import { OidcAuthorizationCodesRow, OidcClientRow } from '@/database/schema';
+import {
+  OidcAuthorizationCodesRow,
+  OidcClientRow,
+  OidcConsentRow,
+} from '@/database/schema';
 import { Injectable } from '@nestjs/common';
 import { webcrypto } from 'crypto';
 import * as jose from 'jose';
@@ -12,6 +16,10 @@ export class OidcReader {
 
   getClient(clientId: string): Promise<OidcClientRow | null> {
     return this.repo.findClientById(clientId);
+  }
+
+  getConsent(userId: string, clientId: string): Promise<OidcConsentRow | null> {
+    return this.repo.findConsent(userId, clientId);
   }
 
   // GET /jwks 응답: 공개키만, kid·alg·use 는 응답 때 붙인다 (3-4)

@@ -5,6 +5,8 @@ import {
   OidcAuthorizationCodesRow,
   OidcClientRow,
   oidcClients,
+  oidcConsents,
+  OidcConsentRow,
 } from '@/database/schema';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -88,5 +90,37 @@ export class OidcRepository {
       .returning({ codeHash: oidcAuthorizationCodes.codeHash });
 
     return rows.length > 0;
+  }
+
+  // ─────────────────────────────────────────
+  // 동의 (oidc_consents) — user + client 당 1행
+  // ─────────────────────────────────────────
+  async findConsent(
+    userId: string,
+    clientId: string,
+  ): Promise<OidcConsentRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(oidcConsents)
+      .where(
+        and(
+          eq(oidcConsents.userId, userId),
+          eq(oidcConsents.clientId, clientId),
+        ),
+      )
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  // 있으면 scope 만 바꾸고, 없으면 새로 넣는다
+  async upsertConsent(userId: string, clientId: string, scope: string) {
+    await this.db
+      .insert(oidcConsents)
+      .values({ userId, clientId, scope })
+      .onConflictDoUpdate({
+        target: [oidcConsents.userId, oidcConsents.clientId],
+        set: { scope },
+      });
   }
 }

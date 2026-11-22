@@ -6,9 +6,13 @@ import bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import * as jose from 'jose';
 import { UsersReader } from '../../users/readers/users.reader';
-import { CODE_TTL_SECONDS } from '../constants/oidc.constants';
+import {
+  CODE_TTL_SECONDS,
+  CONSENT_URL_TTL_SECONDS,
+} from '../constants/oidc.constants';
 import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
+import { ConsentBodyDto } from '../dto/consent.dto';
 import { OidcReader } from '../readers/oidc.reader';
 import { OidcRepository } from '../repositories/oidc.repository';
 import { AccessTokenPayload } from '../types/oidc.types';
@@ -29,6 +33,38 @@ const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 function hasOpenIdScope(scope?: string | null): scope is string {
   if (!scope) return false;
   return scope.split(/\s+/).includes('openid');
+}
+
+function splitScope(scope?: string | null): string[] {
+  return scope ? scope.split(/\s+/).filter(Boolean) : [];
+}
+
+// 동의 화면 URL 에 싣는 /authorize 파라미터 (이것만 서명·복원한다)
+const CONSENT_QUERY_KEYS = [
+  'client_id',
+  'redirect_uri',
+  'response_type',
+  'scope',
+  'state',
+  'code_challenge',
+  'code_challenge_method',
+  'nonce',
+] as const;
+
+// 서명 = HMAC(정렬한 파라미터 + exp + 사용자 id).
+// 사용자 id 는 URL 에 안 싣고 서명에만 섞는다 → 다른 사람이 로그인한 상태로 보내면 서명이 안 맞음
+// 정렬하는 이유: 같은 내용이면 순서가 달라도 같은 서명이 나와야 해서
+function signConsentParams(params: Record<string, string>, userId: string) {
+  const canonical = new URLSearchParams(
+    Object.entries({ ...params, sub: userId }).sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    ),
+  ).toString();
+
+  return crypto
+    .createHmac('sha256', Buffer.from(env.OIDC_CONSENT_SECRET, 'base64'))
+    .update(canonical)
+    .digest('base64url');
 }
 
 function scopeToClaims(scope: string, user: User) {
@@ -185,7 +221,145 @@ export class OidcManager {
   }
 
   // ─────────────────────────────────────────
-  // /token client 인증 (단계 5 ②)
+  // 동의 (단계 8)
+  // ─────────────────────────────────────────
+
+  // 동의 화면을 보여줘야 하나?
+  // 자사 client(skipConsent) 이거나, 저장된 동의가 요청 scope 를 다 덮으면 안 물어본다
+  async needsConsent(clientId: string, userId: string, scope: string) {
+    const client = await this.oidcReader.getClient(clientId);
+    if (client?.skipConsent) return false;
+
+    const consent = await this.oidcReader.getConsent(userId, clientId);
+    if (!consent) return true;
+
+    const granted = splitScope(consent.scope);
+    const allGranted = splitScope(scope).every((s) => granted.includes(s));
+
+    // 다 허락밭았으면 동의 필요없으니 false로 리턴
+    return !allGranted;
+  }
+
+  // 검사 통과한 /authorize 요청 → 서명된 동의 화면 URL
+  makeConsentUrl(query: AuthorizeQueryDto, userId: string) {
+    const params: Record<string, string> = {};
+
+    for (const key of CONSENT_QUERY_KEYS) {
+      const value = query[key];
+      if (value !== undefined) params[key] = value;
+    }
+
+    // 유효기간 10분
+    params.exp = String(
+      Math.floor(Date.now() / 1000) + CONSENT_URL_TTL_SECONDS,
+    );
+
+    const url = new URL('/consent', env.WEB_URL);
+
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
+    }
+    url.searchParams.set('sig', signConsentParams(params, userId));
+
+    return url.toString();
+  }
+
+  // 동의 화면이 돌려준 쿼리 → 서명·만료 확인 → 원래 /authorize 요청
+  verifyConsentQuery(oauthQuery: string, userId: string) {
+    const search = new URLSearchParams(oauthQuery);
+    const sig = search.get('sig');
+    const exp = search.get('exp');
+    if (!sig || !exp) return 'missing_signature';
+
+    const params: Record<string, string> = {};
+    for (const key of CONSENT_QUERY_KEYS) {
+      const value = search.get(key);
+      if (value !== null) params[key] = value;
+    }
+    params.exp = exp;
+
+    // 길이가 다르면 timingSafeEqual 이 throw 하니까 먼저 거른다
+    const expected = Buffer.from(signConsentParams(params, userId));
+    const received = Buffer.from(sig);
+    if (
+      expected.length !== received.length ||
+      !crypto.timingSafeEqual(expected, received)
+    ) {
+      return 'bad_signature';
+    }
+
+    if (Number(exp) <= Math.floor(Date.now() / 1000)) return 'consent_expired';
+
+    // 서명이 맞으면 우리가 만든 값 그대로라 AuthorizeQueryDto 모양
+    return params as unknown as AuthorizeQueryDto;
+  }
+
+  // [허용]/[거부] 처리. 성공하면 RP 로 보낼 주소+파라미터, 실패하면 이유 문자열
+  async decideConsent(
+    ctx: RequestContext,
+    body: ConsentBodyDto,
+    userId: string,
+  ) {
+    const query = this.verifyConsentQuery(body.oauth_query, userId);
+    if (typeof query === 'string') {
+      this.appLogger.warn(ctx, '동의 요청 서명 확인 실패', { reason: query });
+      return query;
+    }
+
+    // 10분 사이 client 가 지워졌거나 redirect_uri 가 빠졌을 수 있어서 한 번 더
+    const valid = await this.validateAuthorizeRequest(ctx, query);
+    if (typeof valid === 'string') return valid;
+
+    if (!body.accept) {
+      return {
+        redirectUri: query.redirect_uri,
+        params: { error: 'access_denied', state: query.state },
+      };
+    }
+
+    // 허락한 scope 는 요청 scope 안에서만, openid 는 꼭
+    const requested = splitScope(valid.scope);
+    const picked = splitScope(body.scope);
+    if (
+      !picked.includes('openid') ||
+      !picked.every((s) => requested.includes(s))
+    ) {
+      this.appLogger.warn(ctx, '허락한 scope 가 요청 범위를 벗어남', {
+        requested: valid.scope,
+        picked: body.scope,
+      });
+      return 'invalid_scope';
+    }
+    // 요청 순서대로 맞춰 둔다 ('openid email profile' 처럼)
+    const grantedScope = requested.filter((s) => picked.includes(s)).join(' ');
+
+    // 저장은 예전 동의 + 이번 동의 (예전에 허락한 걸 잃지 않게)
+    const prev = await this.oidcReader.getConsent(userId, query.client_id);
+    const merged = [...new Set([...splitScope(prev?.scope), ...picked])];
+    await this.oidcRepository.upsertConsent(
+      userId,
+      query.client_id,
+      merged.join(' '),
+    );
+
+    const code = await this.issueAuthorizationCode({
+      clientId: query.client_id,
+      userId,
+      redirectUri: query.redirect_uri,
+      scope: grantedScope, // 토큰 scope = 이번에 허락받은 것
+      nonce: query.nonce,
+      codeChallenge: valid.codeChallenge,
+      authTime: new Date(),
+    });
+
+    return {
+      redirectUri: query.redirect_uri,
+      params: { code, state: query.state },
+    };
+  }
+
+  // ─────────────────────────────────────────
+  // /token client 인증
   // ─────────────────────────────────────────
   async authenticateClient(clientId: string, clientSecret: string) {
     const RPClient = await this.oidcReader.getClient(clientId);
