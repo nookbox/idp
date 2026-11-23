@@ -350,4 +350,66 @@ describe('OIDC consent (e2e)', () => {
     expect(res.status).toBe(403);
     expect(res.body.url).toBeUndefined();
   });
+
+  it('11. 동의 철회 → 204, 다시 /authorize 하면 동의 화면', async () => {
+    const clientId = await registerClient();
+    const { codeChallenge } = createPkce();
+    const oauthQuery = await getConsentQuery(
+      clientId,
+      'openid email profile',
+      codeChallenge,
+    );
+
+    const res = await postConsent({
+      oauth_query: oauthQuery,
+      accept: true,
+      scope: 'openid email profile',
+    });
+
+    // 동의 저장
+    expect(res.status).toBe(200);
+
+    // 동의 철회
+    const deleteConsentRes = await request(app.getHttpServer())
+      .delete(`/api/oidc/consents/${clientId}`)
+      .set('Origin', WEB_URL);
+
+    expect(deleteConsentRes.status).toBe(204);
+
+    const redirectRes = await authorize(
+      clientId,
+      'openid email profile',
+      codeChallenge,
+    );
+
+    expect(redirectRes.status).toBe(302);
+    const location = new URL(redirectRes.headers.location);
+    // 철회했으니 RP 가 아니라 다시 동의 화면으로, code 없이
+    expect(location.origin + location.pathname).toBe(
+      `${WEB_URL}${CONSENT_PATH}`,
+    );
+    expect(location.searchParams.get('code')).toBeNull();
+  });
+
+  it('12. 철회를 다른 Origin 에서 보내면 → 403 (CSRF)', async () => {
+    const clientId = await registerClient();
+
+    const res = await request(app.getHttpServer())
+      .delete(`/api/oidc/consents/${clientId}`)
+      .set('Origin', 'https://evil.example');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('13. 동의한 적 없는 client 철회 → 204 (몇 번 불러도 같은 결과)', async () => {
+    const clientId = await registerClient(); // 새 client = 저장된 동의 없음
+
+    const res = await request(app.getHttpServer())
+      .delete(`/api/oidc/consents/${clientId}`)
+      .set('Origin', WEB_URL);
+
+    expect(res.status).toBe(204);
+  });
+
+  it.todo('14. 로그인 안 한 상태로 철회 → 401 (세션 생기면, Phase 2)');
 });

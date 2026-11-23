@@ -1,6 +1,6 @@
 # 단계 8: 동의(consent) — "이 앱에 내 정보를 줘도 될까요?"
 
-> 시작: 2026-11-22 · 상태: 🟡 서버 완료 (e2e 10개 초록), web UI·철회 남음
+> 시작: 2026-11-22 · 상태: 🟡 서버·화면 완료 (e2e 10개 + 손 확인 3개), 철회 남음
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 8 구현 과제와 리뷰 기록만 담는다.
 > 단계 7 에 이어 **e2e 먼저** (TDD).
 
@@ -55,7 +55,7 @@ IdP: client·redirect_uri·PKCE 검사 → 로그인 확인
 - [x] /authorize: 로그인 확인 뒤 "저장된 동의가 요청 scope 를 덮나" 판단 (Manager)
 - [x] 동의 화면으로 넘길 때 요청 정보 → **서명된 URL** (위 결정. 정렬 후 HMAC, `exp`, 사용자 id 포함)
 - [x] 허용/거부 받는 엔드포인트 (이 요청이 정말 그 사용자가 보낸 건지 — CSRF)
-- [ ] 동의 화면 UI (web) ← 학습자 직접
+- [x] 동의 화면 UI (web `/consent`) (2026-11-23)
 
 ### 구현 메모 (2026-11-22, 멘토 작성 → 학습자 검수)
 - 테이블 `oidc_consents` (PK `user_id`+`client_id`, 둘 다 FK `on delete cascade`, `scope` 공백 문자열) — migration 0012
@@ -65,6 +65,22 @@ IdP: client·redirect_uri·PKCE 검사 → 로그인 확인
 - `POST /api/oidc/consent` body `{ oauth_query, accept, scope? }` → Origin ≠ WEB_URL 이면 403, 로그인 없으면 401, 서명·만료·scope 오류면 400 `invalid_request`, 성공 200 `{ url }` (web 이 그 url 로 이동)
 - 동의 저장은 예전 + 이번 합침. 토큰 scope 는 이번에 허락한 것만
 - **web 화면이 할 일**: 쿼리 읽기 → client 이름·scope 체크박스 표시(openid 는 고정) → `fetch(POST, credentials: 'include', JSON)` → `location.href = res.url`
+
+### 화면 메모 (2026-11-23)
+- `apps/auth/web/src/app/(main)/consent/page.tsx` 한 파일 (`'use client'`, `use(searchParams)`). FSD 레이어는 안 나눔 — 이 화면에서만 쓰니까. `shared/ui` 의 `Checkbox`·`SubmitButton` 재사용
+- 팝업(작은 창)이든 전체 탭이든 **페이지 하나** — 창을 여는 건 RP, 안의 화면은 IdP. 반응형으로 해결
+- 스타일: 큰 틀은 넷플릭스(검정 배경·반투명 카드·큰 굵은 제목·꽉 찬 세로 버튼), 버튼은 NOOKBOX 보라(`SubmitButton`)
+  - 폰(640px 미만)은 카드 없이 화면 전체 + 위에서부터, `sm:` 이상은 가운데 카드. 한글 줄바꿈 `break-keep`
+- openid 체크박스는 항상 체크·잠금 (식별은 `sub` 가 하고, email 은 식별용 아님 → 선택)
+- 버튼: `useTransition` 으로 pending, 누른 버튼에만 스피너(`action` 상태), 처리 중엔 둘 다 잠금. `SubmitButton` 에 `spinnerOnly` 추가
+- 에러: 누를 때 지우지 않음(지웠다 생기면 버튼이 튐 = 레이아웃 시프트). "YOU ARE HERE" 감성 박스(별·점선·빨간 핀) + 등장 애니메이션은 `key={error}` 로 **문구가 바뀔 때만** 재생, `motion-safe:`, `role="alert"`
+
+### 손 확인 (2026-11-23, 개발용 client `dev-consent` skipConsent=false)
+- [x] 처음 /authorize → 동의 화면 → [허용] → `callback?code=...&state=...`
+- [x] 다시 /authorize → 동의 화면 없이 바로 code
+- [x] [거부] → `callback?error=access_denied&state=...`
+- 참고: 동의 화면 URL 을 직접 다시 열면 10분 안엔 또 허용 가능 (서명 URL 의 재사용 허용, 결정 때 받아들인 부분). "건너뛰기"는 /authorize 에서 판단
+- 발견: 로컬 `apps/auth/.env` 의 `PORT`·`BETTER_AUTH_URL`, web `.env` 의 `NEXT_PUBLIC_AUTH_URL` 이 3001 로 어긋남 (`OIDC_ISSUER`·`.env.example` 은 3011) → 3011 로 맞추기
 
 ### ③ 철회
 - [ ] 계정 화면에서 동의 철회 (기존 `services-section` 연결)
