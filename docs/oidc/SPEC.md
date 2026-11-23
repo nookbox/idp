@@ -147,8 +147,9 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - 스펙: OIDC Core §5.3
 
 ### 단계 8 — 동의(consent)
-- [ ] 처음 접근하는 client + scope 조합이면 동의 화면
-- [ ] 동의 저장 → 다음엔 생략. 더 넓은 scope 요청 시 다시 동의
+- [x] 처음 접근하는 client + scope 조합이면 동의 화면 (서버 쪽, e2e 1·5)
+- [x] 동의 저장 → 다음엔 생략. 더 넓은 scope 요청 시 다시 동의 (e2e 4·5)
+- [ ] 동의 화면 UI (web `/consent`)
 - [ ] 계정 화면에서 동의 철회 (기존 `services-section` 연결)
 
 ### 단계 9 — Refresh token & 로그아웃
@@ -175,7 +176,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 8 consent (2026-11-22 시작, e2e 먼저)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 8 consent — 서버 완료, 다음은 web `/consent` 화면 (학습자 직접)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -188,7 +189,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5 token | ✅ 완료 (2026-11-12, e2e 7개) → [stages/stage-5-token.md](stages/stage-5-token.md) |
 | 6 PKCE | ✅ 완료 (2026-11-14, e2e 8·9 + 확인 질문 6-1·6-2) |
 | 7 userinfo | ✅ 완료 (2026-11-21, e2e 10~18) → [stages/stage-7-userinfo.md](stages/stage-7-userinfo.md) |
-| 8 consent | 🟡 진행 중 (2026-11-22) → [stages/stage-8-consent.md](stages/stage-8-consent.md) |
+| 8 consent | 🟡 서버 완료 (2026-11-22, e2e 19~28 = consent 1~10), UI·철회 남음 → [stages/stage-8-consent.md](stages/stage-8-consent.md) |
 | 9 refresh/logout | ⬜ |
 | 10 better-auth 제거 | ✅ (2026-10-19, 앞당김) |
 
@@ -277,6 +278,8 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-11-19: 단계 7 e2e 10~14 초록불. /userinfo 401 은 `@Res()` + 컨트롤러 private 도우미 `bearerUnauthorized`(헤더 없음 → `Bearer`, 토큰 불량 → `Bearer error="invalid_token"` + body). `jwtVerify` 가 throw → 잡지 않으면 500 → Manager 에서 try/catch 로 `'token_verify_failed'` 리턴(이유 문자열은 HTTP 코드가 아니라 **왜**). 13(id_token 보냄)·14(만료)는 `typ`·`exp` 검사 덕에 구현 없이 바로 초록불, 14 는 서버 서명 키로 `exp` 만 과거로 다시 서명. 헷갈린 점: `payload.scope` 가 `unknown`(jose 는 표준 claim 만 타입을 앎), "user 값을 그냥 claim 으로 쓰면?" → 값은 user, **넣을지는 scope**. 비교: almondyoung-server `getUserInfo` 는 scope 무시(1st party 전제), 대신 탈퇴·휴면 사용자 401 → 우리도 e2e 16 으로 추가.
 - 2026-11-21: 단계 7 완료(e2e 15~18 추가, 전체 18개 초록불). 15: scope claim 은 **id_token 의 claim 을 정답**으로 비교(DB 안 봄), `toBeDefined()` 로 `undefined === undefined` 통과 방지, 구현 되돌려 빨간불 확인. 16: `sub` 만 없는 id 로 다시 서명 → `'user_not_found'`. 17: `aud` 는 client 가 여럿이라 `jwtVerify` 에 고정 불가 → `getClient(aud)`(`string | string[]` 처리) → `'unknown_client'`. scope→claim 규칙을 순수 함수 `scopeToClaims(scope, user)` 로 뺌(필요한 값만 받기, 이름은 변환이라 get 아님). 응답 타입 `UserInfoResDto`, 액세스 토큰 내부 모양 `types/oidc.types.ts` 의 `AccessTokenPayload`(scope 는 객체가 아니라 공백 구분 문자열). 헷갈린 점: `??` vs `&&`(includes 는 null 이 안 됨), `...` 펼치기 없이 키로 감싸면 한 겹 더 생김, 이유 문자열(로그용·자유) vs 에러 코드(응답용·스펙 값), Reader 가 왜 있나(Repository 는 읽기·쓰기 둘 다, Reader 는 읽어서 쓸 모양으로). 실수: 16 을 14 복사본으로 둠(만료 때문에 401 → 검증 대상이 아님), 17 에서 `SignJWT` 를 `.sign()` 안 해 엉뚱한 이유로 초록불, `getClient(payload.sub)`, `'open id'` 띄어쓰기, `res.body.openid` 검사(→ 7-4).
 - 2026-11-22: 단계 8 시작. 확인 질문 8-1 ✅ 8-2 ✅ 8-3 △(동의 키에 client 빠짐). e2e 를 `e2e/` 폴더로 분리(`helpers.ts` + `token`·`userinfo`·`consent` spec, 각 spec 맨 위 `dotenv/config` 필수). 설계 의논: 동의 화면은 web. 요청 전달 방식 3가지 비교 — A URL 그대로(조작 가능), B 번호표(node-oidc-provider `Interaction`), C 서명된 URL(better-auth: 정렬 후 HMAC `sig` + `exp`, DB 없음). **학습자 결정 C** (이유: 간단, 재사용돼도 redirect_uri·secret·verifier 가 막음). 챙길 것: 서명에 사용자 id, POST CSRF, HMAC 키 env. 헷갈린 점: CSRF 는 가로채기가 아니라 **남의 이름으로 요청 위조**, A 의 핵심 문제는 CSRF 보다 **조작**. 멘토 정정: 처음에 옛 better-auth 화면을 보고 "번호표 방식"이라 했으나 소스 확인 결과 서명된 URL.
+
+- 2026-11-22 (2): 단계 8 서버 구현 — 학습자 요청으로 **멘토가 e2e 10개 + 구현을 작성**, 학습자는 검수. `oidc_consents`(PK user+client, FK cascade, migration 0012), env `OIDC_CONSENT_SECRET`·`WEB_URL`. Manager: `needsConsent`(skipConsent → 저장 동의가 요청 scope 를 `every` 로 다 덮나), `makeConsentUrl`(정렬 HMAC, 사용자 id 는 URL 에 안 싣고 서명에만), `verifyConsentQuery`(`timingSafeEqual` + exp 10분), `decideConsent`(재검증 → 거부 `access_denied` / 허용 scope 는 요청 범위 안 + openid 필수 → 동의는 예전+이번 합쳐 저장, code scope 는 이번 허락분). `POST /api/oidc/consent` 는 Origin 검사(CSRF, 403) → 200 `{ url }`. 전체 e2e 28개 초록. 이름 결정: `build*` → `make*` ("빌드"와 헷갈려서, `create` 는 DB 생성 느낌이라 제외). 짚은 문법: `every`(전부 통과?) vs `some`, `!` 는 줄 전체 결과를 뒤집음, `Object.entries`, `filter(Boolean)`.
 
 ## 9. 오답 노트 (복습용)
 

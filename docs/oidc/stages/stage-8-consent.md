@@ -1,6 +1,6 @@
 # 단계 8: 동의(consent) — "이 앱에 내 정보를 줘도 될까요?"
 
-> 시작: 2026-11-22 · 상태: 🟡 진행 중
+> 시작: 2026-11-22 · 상태: 🟡 서버 완료 (e2e 10개 초록), web UI·철회 남음
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 8 구현 과제와 리뷰 기록만 담는다.
 > 단계 7 에 이어 **e2e 먼저** (TDD).
 
@@ -40,21 +40,31 @@ IdP: client·redirect_uri·PKCE 검사 → 로그인 확인
 ## 만들 것
 
 ### ① e2e 먼저 (빨간불)
-- [ ] 처음 보는 user+client → code 대신 **동의 화면으로** (code 없음)
-- [ ] 허용 → code 발급, 그 code 로 받은 토큰의 scope = 허락한 scope
-- [ ] 거부 → 302 `error=access_denied` (+ state 그대로), code 없음
-- [ ] 이미 동의한 scope 범위 안 → 동의 화면 없이 바로 code
-- [ ] 더 넓은 scope 요청 (예: email 동의 후 email profile) → 다시 동의 화면
-- [ ] 일부만 허용 (email O, profile X) → /userinfo 에 name 없음 (단계 7 의 18 과 같은 확인)
-- [ ] 동의 생략 client → 동의 화면 없이 바로 code
+- [x] 처음 보는 user+client → code 대신 **동의 화면으로** (code 없음)
+- [x] 허용 → code 발급, 그 code 로 받은 토큰의 scope = 허락한 scope
+- [x] 거부 → 302 `error=access_denied` (+ state 그대로), code 없음
+- [x] 이미 동의한 scope 범위 안 → 동의 화면 없이 바로 code
+- [x] 더 넓은 scope 요청 (예: email 동의 후 email profile) → 다시 동의 화면
+- [x] 일부만 허용 (email O, profile X) → /userinfo 에 name 없음 (단계 7 의 18 과 같은 확인)
+- [x] 동의 생략 client → 동의 화면 없이 바로 code
+- [x] (추가) oauth_query 조작 → 400 / 요청보다 넓게 허용 → 400 / 다른 Origin POST → 403 (CSRF)
 
 ### ② 구현 (초록불) — 설계는 학습자가 정한다
-- [ ] 동의 저장소: 키 = **user + client**, 값 = 허락한 scope (테이블·컬럼은 학습자가)
-- [ ] client 에 "동의 생략" 표시
-- [ ] /authorize: 로그인 확인 뒤 "저장된 동의가 요청 scope 를 덮나" 판단 (Manager)
-- [ ] 동의 화면으로 넘길 때 요청 정보 → **서명된 URL** (위 결정. 정렬 후 HMAC, `exp`, 사용자 id 포함)
-- [ ] 허용/거부 받는 엔드포인트 (이 요청이 정말 그 사용자가 보낸 건지 — CSRF)
-- [ ] 동의 화면 UI (web)
+- [x] 동의 저장소: 키 = **user + client**, 값 = 허락한 scope (테이블·컬럼은 학습자가)
+- [x] client 에 "동의 생략" 표시
+- [x] /authorize: 로그인 확인 뒤 "저장된 동의가 요청 scope 를 덮나" 판단 (Manager)
+- [x] 동의 화면으로 넘길 때 요청 정보 → **서명된 URL** (위 결정. 정렬 후 HMAC, `exp`, 사용자 id 포함)
+- [x] 허용/거부 받는 엔드포인트 (이 요청이 정말 그 사용자가 보낸 건지 — CSRF)
+- [ ] 동의 화면 UI (web) ← 학습자 직접
+
+### 구현 메모 (2026-11-22, 멘토 작성 → 학습자 검수)
+- 테이블 `oidc_consents` (PK `user_id`+`client_id`, 둘 다 FK `on delete cascade`, `scope` 공백 문자열) — migration 0012
+- env: `OIDC_CONSENT_SECRET`(HMAC, base64 32바이트+, JWKS 키와 별개), `WEB_URL`(동의 URL·Origin 검사)
+- 동의 URL: `WEB_URL/consent?client_id&redirect_uri&response_type&scope&state&code_challenge&code_challenge_method&nonce&exp&sig` (exp = 10분, `CONSENT_URL_TTL_SECONDS`)
+- 서명: 위 파라미터 + `sub`(사용자 id) 를 키 순서로 정렬 → HMAC-SHA256 → base64url. `sub` 는 URL 에 없음 → 다른 사용자가 보내면 서명 불일치
+- `POST /api/oidc/consent` body `{ oauth_query, accept, scope? }` → Origin ≠ WEB_URL 이면 403, 로그인 없으면 401, 서명·만료·scope 오류면 400 `invalid_request`, 성공 200 `{ url }` (web 이 그 url 로 이동)
+- 동의 저장은 예전 + 이번 합침. 토큰 scope 는 이번에 허락한 것만
+- **web 화면이 할 일**: 쿼리 읽기 → client 이름·scope 체크박스 표시(openid 는 고정) → `fetch(POST, credentials: 'include', JSON)` → `location.href = res.url`
 
 ### ③ 철회
 - [ ] 계정 화면에서 동의 철회 (기존 `services-section` 연결)
