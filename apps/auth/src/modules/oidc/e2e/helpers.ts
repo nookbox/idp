@@ -79,3 +79,5 @@ export async function postToken(
       code_verifier: codeVerifier,
     });
 }
+
+export const WEB_URL = process.env.WEB_URL!;

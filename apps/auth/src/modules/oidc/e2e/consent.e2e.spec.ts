@@ -11,7 +11,7 @@ import request from 'supertest';
 import { REDIRECT_URI, createPkce, createTestApp } from './helpers';
 
 // 동의 화면(web) 주소. /authorize 가 동의가 필요하면 여기로 보낸다
-const WEB_URL = process.env.WEB_URL!;
+import { WEB_URL } from './helpers';
 const CONSENT_PATH = '/consent';
 
 // 테스트 client 들이 같이 쓰는 secret (테스트 안에서만 쓰는 랜덤값)

@@ -29,6 +29,7 @@
 
 ### Phase 2 — 회원/세션까지 직접 구현
 - 비밀번호 해싱, 세션 쿠키, 이메일 인증, 재설정 등 직접 구현
+  - 2026-11-24 학습자 결정: IdP 로그인 상태는 **JWT 를 쿠키에 담는 방식** (아몬드영과 같게). 테스트는 그 쿠키를 `.set('Cookie', ...)` 로 실어 보내면 됨
 - **better-auth 제거로 같이 사라져서 다시 만들어야 하는 것**:
   - [ ] 로그인/세션 (~~단계 4 선행 조건~~ 2026-10-20 Phase 2 로 유지). 기존 비밀번호 해시(`account` 테이블)는 버림 → 회원 다시 가입
     - 세션이 생기면 바꿀 곳 3개: `CurrentUserReader.getCurrentUser` 안, `/authorize` 미로그인 처리(지금 임시 `error=login_required` 302 → 로그인 화면 redirect 후 4번 복귀. `login_required` 는 `prompt=none` 전용으로 남김), `/authorize` 의 `authTime`(지금 임시 `new Date()` → 세션의 로그인 시각)
