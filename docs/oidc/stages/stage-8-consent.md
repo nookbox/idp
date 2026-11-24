@@ -1,6 +1,6 @@
 # 단계 8: 동의(consent) — "이 앱에 내 정보를 줘도 될까요?"
 
-> 시작: 2026-11-22 · 상태: 🟡 서버·화면 완료 (e2e 10개 + 손 확인 3개), 철회 남음
+> 시작: 2026-11-22 · 상태: ✅ 완료 (2026-11-24, e2e 13개 + 손 확인 3개). 철회 화면은 Phase 2
 > 전체 로드맵·학습 로그·오답 노트는 [SPEC.md](../SPEC.md). 이 문서는 단계 8 구현 과제와 리뷰 기록만 담는다.
 > 단계 7 에 이어 **e2e 먼저** (TDD).
 
@@ -82,9 +82,15 @@ IdP: client·redirect_uri·PKCE 검사 → 로그인 확인
 - 참고: 동의 화면 URL 을 직접 다시 열면 10분 안엔 또 허용 가능 (서명 URL 의 재사용 허용, 결정 때 받아들인 부분). "건너뛰기"는 /authorize 에서 판단
 - 발견: 로컬 `apps/auth/.env` 의 `PORT`·`BETTER_AUTH_URL`, web `.env` 의 `NEXT_PUBLIC_AUTH_URL` 이 3001 로 어긋남 (`OIDC_ISSUER`·`.env.example` 은 3011) → 3011 로 맞추기
 
-### ③ 철회
-- [ ] 계정 화면에서 동의 철회 (기존 `services-section` 연결)
-- [ ] 철회 후 /authorize → 다시 동의 화면
+### ③ 철회 (2026-11-24, 서버 API + e2e. 학습자 구현)
+- [x] `DELETE /api/oidc/consents/:clientId` — 사용자는 URL 이 아니라 **세션**에서 (남의 동의 못 지움)
+  - Origin ≠ WEB_URL(헤더 없음 포함) → 403 `access_denied` (e2e 12). RP 가 부르는 철회는 RFC 7009 `/revoke` + client 인증으로 따로 (단계 9 후보)
+  - 로그인 없음 → 401 `login_required` (e2e 14 todo, 세션 생기면)
+  - 항상 204 — 없던 동의를 지워도 204 (멱등 + 동의 있었는지 안 알려줌, e2e 13)
+- [x] 철회 후 /authorize → 다시 동의 화면 (e2e 11)
+- 응답: 이 컨트롤러는 OAuth 에러 모양을 직접 정하려고 `@Res()` 를 쓰므로 `@HttpCode` 대신 `res.status(204).send()` 로 통일 (`@Res()` 면 Nest 가 응답을 안 보내고 `@HttpCode` 도 무시됨)
+- **단계 9 연결**: `OidcManager.revokeConsent` 에 TODO — 이 client 의 refresh token 도 같이 폐기
+- [ ] 계정 화면에서 철회 버튼 (기존 `services-section` 연결) → Phase 2 (계정 화면·세션 생긴 뒤)
 
 ## 완료 확인 방법
 

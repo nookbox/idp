@@ -77,4 +77,7 @@ export class OidcService implements OnModuleInit {
   userInfo(accessToken: string) {
     return this.manager.getUserInfo(accessToken);
   }
+  revokeConsent(userId: string, clientId: string) {
+    return this.manager.revokeConsent(userId, clientId);
+  }
 }

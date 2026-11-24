@@ -504,4 +504,9 @@ export class OidcManager {
       return 'token_verify_failed';
     }
   }
+
+  async revokeConsent(userId: string, clientId: string) {
+    // TODO: 여기서 이 client 의 refresh token 도 같이 폐기
+    await this.oidcRepository.deleteConsent(userId, clientId);
+  }
 }

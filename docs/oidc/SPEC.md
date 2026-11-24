@@ -150,7 +150,7 @@ RP:              id_token 검증(JWKS) → nonce 확인 → sub 로 RP 자체 �
 - [x] 처음 접근하는 client + scope 조합이면 동의 화면 (서버 쪽, e2e 1·5)
 - [x] 동의 저장 → 다음엔 생략. 더 넓은 scope 요청 시 다시 동의 (e2e 4·5)
 - [x] 동의 화면 UI (web `/consent`, 2026-11-23)
-- [ ] 계정 화면에서 동의 철회 (기존 `services-section` 연결)
+- [x] 동의 철회 서버 API `DELETE /api/oidc/consents/:clientId` (e2e 11~13, 2026-11-24). 계정 화면 버튼은 Phase 2
 
 ### 단계 9 — Refresh token & 로그아웃
 - [ ] `offline_access` scope 일 때만 refresh token 발급
@@ -176,7 +176,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 
 ## 7. 진행 상태
 
-- 현재 단계: **단계 8 consent — 서버·화면 완료, 다음은 철회 (서버 API + e2e)** (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
+- 현재 단계: **단계 9 refresh/logout — 시작 전** (단계 8 은 2026-11-24 완료) (로그인/세션은 당겨오지 않음, 2026-10-20 결정)
 - 학습 브랜치: `feature/oidc` (별도 브랜치 없이 진행)
 
 | 단계 | 상태 |
@@ -189,7 +189,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 5 token | ✅ 완료 (2026-11-12, e2e 7개) → [stages/stage-5-token.md](stages/stage-5-token.md) |
 | 6 PKCE | ✅ 완료 (2026-11-14, e2e 8·9 + 확인 질문 6-1·6-2) |
 | 7 userinfo | ✅ 완료 (2026-11-21, e2e 10~18) → [stages/stage-7-userinfo.md](stages/stage-7-userinfo.md) |
-| 8 consent | 🟡 서버·화면 완료 (2026-11-23, e2e consent 1~10 + 손 확인), 철회 남음 → [stages/stage-8-consent.md](stages/stage-8-consent.md) |
+| 8 consent | ✅ 완료 (2026-11-24, e2e consent 1~13 + 손 확인, 철회 화면은 Phase 2) → [stages/stage-8-consent.md](stages/stage-8-consent.md) |
 | 9 refresh/logout | ⬜ |
 | 10 better-auth 제거 | ✅ (2026-10-19, 앞당김) |
 
@@ -282,6 +282,7 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 - 2026-11-22 (2): 단계 8 서버 구현 — 학습자 요청으로 **멘토가 e2e 10개 + 구현을 작성**, 학습자는 검수. `oidc_consents`(PK user+client, FK cascade, migration 0012), env `OIDC_CONSENT_SECRET`·`WEB_URL`. Manager: `needsConsent`(skipConsent → 저장 동의가 요청 scope 를 `every` 로 다 덮나), `makeConsentUrl`(정렬 HMAC, 사용자 id 는 URL 에 안 싣고 서명에만), `verifyConsentQuery`(`timingSafeEqual` + exp 10분), `decideConsent`(재검증 → 거부 `access_denied` / 허용 scope 는 요청 범위 안 + openid 필수 → 동의는 예전+이번 합쳐 저장, code scope 는 이번 허락분). `POST /api/oidc/consent` 는 Origin 검사(CSRF, 403) → 200 `{ url }`. 전체 e2e 28개 초록. 이름 결정: `build*` → `make*` ("빌드"와 헷갈려서, `create` 는 DB 생성 느낌이라 제외). 짚은 문법: `every`(전부 통과?) vs `some`, `!` 는 줄 전체 결과를 뒤집음, `Object.entries`, `filter(Boolean)`.
 
 - 2026-11-23: 단계 8 동의 화면(web `/consent`) — 멘토 초안 → 학습자가 디자인 반복(넷플릭스 틀 + NOOKBOX 버튼). 짚은 것: 팝업이든 전체 탭이든 IdP 페이지는 하나(창을 여는 건 RP), `use()` = 클라이언트 컴포넌트의 await, `push` 로 state 배열을 고치면 화면이 안 바뀜(같은 참조) → 새 배열, `useTransition`, 누른 버튼에만 스피너, `spinnerOnly` prop + JSDoc(호버 설명은 prop 에), 에러를 지웠다 다시 띄우면 레이아웃 시프트, `break-keep`(한글 단어 중간 줄바꿈 방지), `role="alert"`, `key` 를 바꿔 애니메이션 재생, `motion-safe:`. 이메일 필수 여부: 식별은 `sub` 로 충분, email 은 선택. 손 확인 3개 통과(허용 → code / 재요청 → 건너뜀 / 거부 → access_denied, 개발용 client `dev-consent`). 거부도 서명 확인하는 이유 = 오픈 리다이렉트 방지. 발견: 로컬 env 포트 3001/3011 불일치.
+- 2026-11-24: 단계 8 동의 철회 — 설계는 학습자 답(DELETE, Origin 은 IdP web 만, 항상 204), e2e 11 학습자·12·13 멘토, 구현은 학습자(Repository → Manager → Service → Controller). 짚은 것: Origin 검사를 `origin && ...` 로 쓰면 헤더 없는 요청이 통과 → POST consent 와 같이 `new URL(env.WEB_URL).origin` 완전 일치. `@Res()` 를 쓰면 `@HttpCode` 무시·직접 `send()` 필요(`passthrough: true` 면 데코레이터 가능) → 이 컨트롤러는 `res` 로 통일. 에러 이름은 같은 상황이면 API 끼리 맞추기(`access_denied`·`login_required`). 단계 8 완료.
 
 ## 9. 오답 노트 (복습용)
 

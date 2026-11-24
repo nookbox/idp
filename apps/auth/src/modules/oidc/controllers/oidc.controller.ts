@@ -5,10 +5,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
   HttpCode,
+  Param,
   Post,
   Query,
   Req,
@@ -280,6 +282,28 @@ export class OidcController {
     }
 
     return res.json(userInfo);
+  }
+
+  @Delete('consents/:clientId')
+  async revokeConsent(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Param('clientId') clientId: string,
+  ) {
+    const ctx = createRequestContext(req);
+
+    // CSRF 체크: Origin 이 서버와 다르면 403
+    const origin = req.headers['origin'];
+    if (origin !== new URL(env.WEB_URL).origin) {
+      this.appLogger.warn(ctx, 'csrf_detected', { origin });
+      return res.status(403).json({ error: 'access_denied' });
+    }
+
+    const currentUser = await this.oidcService.getCurrentUser(req);
+    if (!currentUser) return res.status(401).json({ error: 'login_required' });
+
+    await this.oidcService.revokeConsent(currentUser.id, clientId);
+    return res.status(204).send();
   }
 
   private redirectRP(

@@ -123,4 +123,15 @@ export class OidcRepository {
         set: { scope },
       });
   }
+
+  async deleteConsent(userId: string, clientId: string) {
+    await this.db
+      .delete(oidcConsents)
+      .where(
+        and(
+          eq(oidcConsents.userId, userId),
+          eq(oidcConsents.clientId, clientId),
+        ),
+      );
+  }
 }
