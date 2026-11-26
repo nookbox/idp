@@ -92,6 +92,13 @@
       "when": 1795331697485,
       "tag": "0012_lean_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795699093880,
+      "tag": "0013_unique_talisman",
+      "breakpoints": true
     }
   ]
 }

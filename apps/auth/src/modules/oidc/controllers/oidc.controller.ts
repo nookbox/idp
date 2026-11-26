@@ -23,6 +23,7 @@ import { OAuthErrorRes } from '../dto/oauth-error.dto';
 import { TokenRequestDto, TokenResDto } from '../dto/token.dto';
 import { UserInfoResDto } from '../dto/userinfo.dto';
 import { OidcService } from '../services/oidc.service';
+import { OidcAuthorizationCodesRow } from '@/database/schema';
 
 @Controller('oidc')
 export class OidcController {
@@ -254,12 +255,18 @@ export class OidcController {
 
     const id_token = await this.oidcService.issueIdToken(authCode);
     const access_token = await this.oidcService.issueAccessToken(authCode);
+    const refresh_token = await this.oidcService.issueRefreshToken({
+      clientId: client.clientId,
+      userId: authCode.userId,
+      scope: authCode.scope,
+    });
 
     return res.json({
       access_token,
       token_type: 'Bearer',
       expires_in: 15 * 60, // 15분뒤 만료
       id_token,
+      refresh_token,
     });
   }
 

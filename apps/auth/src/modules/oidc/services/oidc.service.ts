@@ -1,14 +1,14 @@
 import { RequestContext } from '@/common/logger';
+import { OidcAuthorizationCodesRow } from '@/database/schema';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { ConsentBodyDto } from '../dto/consent.dto';
-import { IssueCodeInput, OidcManager } from '../managers/oidc.manager';
+import { OidcManager } from '../managers/oidc.manager';
 import { CurrentUserReader } from '../readers/current-user.reader';
 import { OidcReader } from '../readers/oidc.reader';
-import { OidcAuthorizationCodesRow } from '@/database/schema';
-
-// 흐름만 표현한다 (메서드당 2~3줄). 검증·판단·DB 접근은 Reader/Manager 에.
+import type { IssueRefreshTokenInput } from '../types/oidc.types';
+import { IssueCodeInput } from '../types/oidc.types';
 @Injectable()
 export class OidcService implements OnModuleInit {
   private readonly logger = new Logger(OidcService.name);
@@ -72,6 +72,10 @@ export class OidcService implements OnModuleInit {
 
   async issueAccessToken(authCode: OidcAuthorizationCodesRow): Promise<string> {
     return await this.manager.issueAccessToken(authCode);
+  }
+
+  async issueRefreshToken(input: IssueRefreshTokenInput) {
+    return await this.manager.issueRefreshToken(input);
   }
 
   userInfo(accessToken: string) {

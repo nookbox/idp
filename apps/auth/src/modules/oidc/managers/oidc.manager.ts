@@ -9,34 +9,31 @@ import { UsersReader } from '../../users/readers/users.reader';
 import {
   CODE_TTL_SECONDS,
   CONSENT_URL_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
 } from '../constants/oidc.constants';
 import { encryptPrivateJwk } from '../crypto/signing-key-cipher';
 import { AuthorizeQueryDto } from '../dto/authorize-query.dto';
 import { ConsentBodyDto } from '../dto/consent.dto';
 import { OidcReader } from '../readers/oidc.reader';
 import { OidcRepository } from '../repositories/oidc.repository';
-import { AccessTokenPayload } from '../types/oidc.types';
-
-export type IssueCodeInput = {
-  clientId: string;
-  userId: string;
-  redirectUri: string;
-  scope: string;
-  nonce?: string;
-  codeChallenge: string;
-  authTime: Date;
-};
+import {
+  AccessTokenPayload,
+  IssueCodeInput,
+  IssueRefreshTokenInput,
+} from '../types/oidc.types';
 
 // base64url(sha256(code_verifier)) 는 패딩 없이 항상 43자
 const S256_CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 
-function hasOpenIdScope(scope?: string | null): scope is string {
-  if (!scope) return false;
-  return scope.split(/\s+/).includes('openid');
-}
-
 function splitScope(scope?: string | null): string[] {
   return scope ? scope.split(/\s+/).filter(Boolean) : [];
+}
+
+function hasScope(
+  scope: string | null | undefined,
+  name: string,
+): scope is string {
+  return splitScope(scope).includes(name);
 }
 
 // 동의 화면 URL 에 싣는 /authorize 파라미터 (이것만 서명·복원한다)
@@ -170,7 +167,7 @@ export class OidcManager {
     }
 
     // 공백 구분 목록이라 단어 단위로 비교 ("openidx" 같은 부분 일치 방지)
-    if (!hasOpenIdScope(scope)) {
+    if (!hasScope(scope, 'openid')) {
       this.appLogger.warn(ctx, 'scope 에 openid 없음', { clientId, scope });
 
       return 'invalid_scope';
@@ -218,6 +215,35 @@ export class OidcManager {
     });
 
     return code;
+  }
+
+  async issueRefreshToken(input: IssueRefreshTokenInput) {
+    const { clientId, userId, scope, familyId } = input;
+
+    // 공백 구분 목록이라 단어 단위로 비교 ("openidx" 같은 부분 일치 방지)
+    if (!hasScope(scope, 'offline_access')) {
+      return undefined;
+    }
+
+    const randomToken = crypto.randomBytes(48).toString('base64url');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(randomToken)
+      .digest('base64url');
+
+    // 7일
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
+
+    await this.oidcRepository.insertRefreshToken({
+      tokenHash,
+      clientId,
+      userId,
+      expiresAt,
+      scope,
+      familyId: familyId ?? crypto.randomBytes(16).toString('base64url'),
+    });
+
+    return randomToken;
   }
 
   // ─────────────────────────────────────────

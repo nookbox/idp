@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   jsonb,
   pgTable,
   primaryKey,
@@ -64,7 +65,37 @@ export const oidcConsents = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.clientId] })],
 );
 
+export const oidcRefreshTokens = pgTable(
+  'oidc_refresh_tokens',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    familyId: text('family_id').notNull(),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => oidcClients.clientId, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    scope: text('scope').notNull(),
+    revoked: boolean('revoked').default(false).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (t) => [index('oidc_refresh_tokens_family_id_idx').on(t.familyId)],
+);
+
+/**
+ * SELECT
+ */
 export type OidcClientRow = typeof oidcClients.$inferSelect;
 export type OidcAuthorizationCodesRow =
   typeof oidcAuthorizationCodes.$inferSelect;
 export type OidcConsentRow = typeof oidcConsents.$inferSelect;
+export type OidcRefreshTokenRow = typeof oidcRefreshTokens.$inferSelect;
+
+/**
+ * INSERT
+ */
+export type AuthorizationCodeInsert =
+  typeof oidcAuthorizationCodes.$inferInsert;
+export type RefreshTokenInsert = typeof oidcRefreshTokens.$inferInsert;

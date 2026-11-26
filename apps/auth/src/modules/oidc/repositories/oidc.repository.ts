@@ -1,18 +1,20 @@
 import { DATABASE, type Database } from '@/database/database.types';
 import {
+  AuthorizationCodeInsert,
   jwks,
   oidcAuthorizationCodes,
   OidcAuthorizationCodesRow,
   OidcClientRow,
   oidcClients,
-  oidcConsents,
   OidcConsentRow,
+  oidcConsents,
+  oidcRefreshTokens,
+  RefreshTokenInsert,
 } from '@/database/schema';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 
 type JwksInsert = typeof jwks.$inferInsert;
-type AuthorizationCodeInsert = typeof oidcAuthorizationCodes.$inferInsert;
 
 // OIDC 도메인의 DB 접근을 한 곳에 모은다 (테이블별이 아니라 도메인별 1개).
 // 판단은 하지 않는다. 찾아서 돌려주거나, 받은 값을 그대로 쓴다.
@@ -61,6 +63,10 @@ export class OidcRepository {
   // ─────────────────────────────────────────
   async insertAuthorizationCode(values: AuthorizationCodeInsert) {
     await this.db.insert(oidcAuthorizationCodes).values(values);
+  }
+
+  async insertRefreshToken(values: RefreshTokenInsert) {
+    await this.db.insert(oidcRefreshTokens).values(values);
   }
 
   async findCodeByHash(

@@ -376,6 +376,13 @@ better-auth 테이블은 2026-10-19 에 `user` 만 남기고 제거.
 | 8-2 | 2026-11-22 | (Q2) email 허용·profile 거부면 토큰 scope | "email 과 openid 만" | ✅ | 보충: `openid` 는 OIDC 필수라 보통 고를 수 없게 함. 토큰 scope 는 **요청한 것이 아니라 허락받은 것** → 단계 7 `scopeToClaims` 가 자동으로 거름 | |
 | 8-3 | 2026-11-22 | (Q3) 동의 저장 조합 | "scope 와 userId 혹은 sub" | △ | **client** 가 빠짐. user+scope 만이면 shop 에 한 동의로 처음 보는 evil-app 도 통과. 동의 = "누가(user) 어느 앱(client)에게 무엇(scope)을" → 키 = **user + client**, 값 = scope. sub 와 userId 는 우리 IdP 에서 같은 값 | |
 
+### 단계 9 — Refresh token & 로그아웃
+
+| # | 날짜 | 질문 | 학습자 답 | 상태 | 핵심 포인트 (정답) | 복습 이력 |
+|---|---|---|---|---|---|---|
+| 9-1 | 2026-11-26 | `offline_access` 확인을 `scope.includes('offline_access')` 로 하면 | "true 가 나올 수도 있다… 이유는 까먹음" | △ | **문자열** `.includes` 는 부분 일치 → `'my_offline_access_v2'` 같은 scope 도 true. scope 는 공백 구분 **단어 목록**이라 `split(/\s+/)` 로 배열을 만든 뒤 **배열** `.includes`(단어 전체 일치)로 본다. 단계 4 `response_type.includes('code')` 와 같은 실수 패턴. 레포 본보기: manager 의 `openid` 체크 | |
+| 9-2 | 2026-11-26 | rotation 할 때 새 토큰의 family_id 는 새로 만드나 물려받나 | "모르겠다" (첫 생성 시점은 "code 교환 때" 로 맞힘) | △ | **물려받는다.** 새로 만들면 A 재사용 시 `WHERE family_id = A의 값` 으로 살아있는 C 를 못 찾음. family = rotation 때만 필요한 "같은 로그인에서 나온 토큰" 이름표. 아몬드영은 같은 목적을 `rotatedFrom`(부모 id 사슬)으로 구현 → 전체 폐기 시 조회 반복. 헷갈린 점: JWKS **키** rotation(서명 키 교체, 전체 영향) vs refresh **토큰** rotation(사용자 토큰 교체, 그 로그인만) | |
+
 ## 10. 참고 스펙
 
 - OpenID Connect Core 1.0 — https://openid.net/specs/openid-connect-core-1_0.html

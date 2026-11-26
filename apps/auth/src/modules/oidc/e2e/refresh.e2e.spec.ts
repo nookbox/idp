@@ -50,6 +50,7 @@ describe('OIDC refresh token (e2e)', () => {
     expect(tokenRes.status).toBe(200);
     expect(tokenRes.body.refresh_token).toBeDefined();
   });
+
   it('2. scope 에 offline_access 없음 → refresh_token 없음', async () => {
     const { codeChallenge, codeVerifier } = createPkce();
     const code = await getCode(app, codeChallenge, 'openid email profile');
@@ -58,6 +59,7 @@ describe('OIDC refresh token (e2e)', () => {
     expect(tokenRes.status).toBe(200);
     expect(tokenRes.body.refresh_token).toBeUndefined();
   });
+
   it('3. grant_type=refresh_token → 200, 새 access_token', async () => {
     const { codeChallenge, codeVerifier } = createPkce();
     const code = await getCode(
